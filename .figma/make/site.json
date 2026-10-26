@@ -1,0 +1,10 @@
+{
+  "description": "Lets students order school meals ahead while staff manage orders, menus, and sales, reducing queues and keeping canteen operations organized.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
