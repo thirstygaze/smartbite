@@ -36,3 +36,9 @@ footer{background:#112a21;color:#a9bbb4;min-height:120px;padding:35px max(4vw,28
 @media(max-width:620px){.topbar{height:68px;padding:0 16px}.brand{font-size:20px}.header-actions{gap:7px}.cart-button span,.icon-button{display:none}main{padding:30px 16px 55px}.welcome{display:block}.service-pill{margin-top:20px;width:max-content}.order-card{margin-bottom:40px;padding:18px}.order-copy{min-width:0;flex:1}.steps{overflow:hidden}.step{min-width:100px}.step:not(:last-child):after{width:65px;left:68px}.details-button{display:none}.menu-heading{display:block}.search{width:100%;margin-top:18px}.menu-grid{grid-template-columns:1fr}.food-image{height:210px}footer{flex-direction:column;align-items:flex-start;gap:13px}footer p{border-left:0;padding-left:0;margin:0}.cart-panel{padding:22px}}
 .avatar{border:0}.profile{border:0;background:none;text-align:left;padding:0}
 @media(max-width:620px){main.login-page{padding:0}}
+
+.supabase-pill{display:inline-flex;align-items:center;gap:7px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px}
+.supabase-pill.offline{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.supabase-pill i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px #dcfce7}
+.supabase-pill.offline i{background:#ef4444;box-shadow:0 0 0 3px #fee2e2}
+@media(max-width:760px){.supabase-pill{display:none}}
