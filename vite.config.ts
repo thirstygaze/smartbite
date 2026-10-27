@@ -5,6 +5,19 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import siteConfiguration from './.figma/make/site.json'
+import { backendApiMiddleware } from './src/server/backend'
+
+function backendServerPlugin(): Plugin {
+  return {
+    name: 'smartbite-backend-server',
+    configureServer(server) {
+      server.middlewares.use(backendApiMiddleware())
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(backendApiMiddleware())
+    },
+  }
+}
 
 
 // Vite config — https://vitejs.dev/config/
@@ -25,7 +38,8 @@ export default defineConfig(({ mode }) => {
       minify: !emitSourcemaps,
     },
     plugins: [
-react(),
+      backendServerPlugin(),
+      react(),
       tailwindcss(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),

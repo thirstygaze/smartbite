@@ -1,5 +1,15 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { supabase, MenuItem, OrderRecord } from './supabase'
+import {
+  Profile,
+  Stall,
+  MenuItem,
+  OrderRecord,
+  InventoryItem,
+  AuditLog,
+  UserRole,
+} from './supabase'
+import { canteenApi } from './services/canteenApi'
+import SqlEditor from './components/SqlEditor'
 
 type IconName =
   | 'home'
@@ -14,8 +24,24 @@ type IconName =
   | 'x'
   | 'check'
   | 'database'
+  | 'chef'
+  | 'shield'
+  | 'refresh'
+  | 'store'
+  | 'users'
+  | 'edit'
+  | 'trash'
+  | 'chevron-down'
+  | 'sparkle'
+  | 'eye'
+  | 'eye-off'
+  | 'school'
+  | 'logout'
+  | 'grid'
+  | 'key'
+  | 'lock'
 
-function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
     home: (
       <>
@@ -64,6 +90,108 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
         <path d="M3 12A9 3 0 0 0 21 12" />
       </>
     ),
+    chef: (
+      <>
+        <path d="M6 13.8V4a3 3 0 0 1 6 0v9.8" />
+        <path d="M12 13.8V2a3 3 0 0 1 6 0v11.8" />
+        <path d="M4 14h16v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-7Z" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </>
+    ),
+    refresh: (
+      <>
+        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+      </>
+    ),
+    store: (
+      <>
+        <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+        <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" />
+        <path d="M2 7h20" />
+      </>
+    ),
+    users: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </>
+    ),
+    edit: (
+      <>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </>
+    ),
+    trash: (
+      <>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      </>
+    ),
+    'chevron-down': <path d="m6 9 6 6 6-6" />,
+    sparkle: (
+      <>
+        <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z" />
+      </>
+    ),
+    eye: (
+      <>
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ),
+    'eye-off': (
+      <>
+        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+        <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+        <line x1="2" x2="22" y1="2" y2="22" />
+      </>
+    ),
+    school: (
+      <>
+        <path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4" />
+        <path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2" />
+        <path d="M18 5v17" />
+        <path d="m4 6 8-4 8 4" />
+        <path d="M6 5v17" />
+        <circle cx="12" cy="9" r="2" />
+      </>
+    ),
+    logout: (
+      <>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" x2="9" y1="12" y2="12" />
+      </>
+    ),
+    grid: (
+      <>
+        <rect width="7" height="7" x="3" y="3" rx="1" />
+        <rect width="7" height="7" x="14" y="3" rx="1" />
+        <rect width="7" height="7" x="14" y="14" rx="1" />
+        <rect width="7" height="7" x="3" y="14" rx="1" />
+      </>
+    ),
+    key: (
+      <>
+        <circle cx="7.5" cy="15.5" r="4.5" />
+        <path d="m11 12 9-9h3v3l-2 2v2l-2 2" />
+      </>
+    ),
+    lock: (
+      <>
+        <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </>
+    ),
   }
   return (
     <svg
@@ -82,145 +210,370 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
-const defaultItems: MenuItem[] = [
-  {
-    id: 1,
-    name: 'Chicken Adobo',
-    description: 'Tender chicken, soy-vinegar glaze & steamed rice',
-    price: 75,
-    category: 'Rice Meals',
-    rating: '4.9',
-    image:
-      'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85',
-  },
-  {
-    id: 2,
-    name: 'Crispy Chicken',
-    description: 'Golden fried chicken with gravy & steamed rice',
-    price: 85,
-    category: 'Rice Meals',
-    rating: '4.8',
-    image:
-      'https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85',
-  },
-  {
-    id: 3,
-    name: 'Veggie Rice Bowl',
-    description: 'Fresh seasonal vegetables, egg & garlic rice',
-    price: 65,
-    category: 'Rice Meals',
-    rating: '4.7',
-    image:
-      'https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85',
-  },
-  {
-    id: 4,
-    name: 'Classic Siomai',
-    description: 'Four pork dumplings with chili-garlic sauce',
-    price: 45,
-    category: 'Snacks',
-    rating: '4.9',
-    image:
-      'https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85',
-  },
-  {
-    id: 5,
-    name: 'Silog Breakfast',
-    description: 'Savory beef, fried egg & warm garlic rice',
-    price: 80,
-    category: 'Breakfast',
-    rating: '4.8',
-    image:
-      'https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85',
-  },
-  {
-    id: 6,
-    name: 'Iced Calamansi',
-    description: 'Freshly squeezed, lightly sweetened & chilled',
-    price: 30,
-    category: 'Drinks',
-    rating: '4.6',
-    image:
-      'https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85',
-  },
-]
-
 export default function App() {
+  // Authentication Step & Flow
   const [loggedIn, setLoggedIn] = useState(false)
-  const [studentId, setStudentId] = useState('')
-  const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [category, setCategory] = useState('All')
-  const [query, setQuery] = useState('')
-  const [cart, setCart] = useState<Record<string | number, number>>({ 1: 1 })
+  const [authStep, setAuthStep] = useState<'welcome' | 'signin' | 'signup'>('welcome')
+  const [chosenRole, setChosenRole] = useState<UserRole>('student')
+  const [studentId, setStudentId] = useState('2025-01234')
+  const [password, setPassword] = useState('student123')
+  const [showPassword, setShowPassword] = useState(false)
+  const [authError, setAuthError] = useState('')
+
+  // Sign up fields (First Name, Middle Name, Last Name)
+  const [regFirstName, setRegFirstName] = useState('')
+  const [regMiddleName, setRegMiddleName] = useState('')
+  const [regLastName, setRegLastName] = useState('')
+  const [regStudentId, setRegStudentId] = useState('')
+  const [regDept, setRegDept] = useState('Grade 12 - STEM')
+  const [regPassword, setRegPassword] = useState('')
+
+  // Change Password Modal (Available for EVERY account)
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
+  const [currentPwd, setCurrentPwd] = useState('')
+  const [newPwd, setNewPwd] = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [pwdError, setPwdError] = useState('')
+  const [pwdSuccess, setPwdSuccess] = useState('')
+
+  // Admin User Management & Create User Modal (Only Admin can create Stall, Admin, Staff, Customer)
+  const [adminCreateUserModalOpen, setAdminCreateUserModalOpen] = useState(false)
+  const [newRole, setNewRole] = useState<UserRole>('student')
+  const [newFirstName, setNewFirstName] = useState('')
+  const [newMiddleName, setNewMiddleName] = useState('')
+  const [newLastName, setNewLastName] = useState('')
+  const [newUserId, setNewUserId] = useState('')
+  const [newDept, setNewDept] = useState('Grade 12 - STEM')
+  const [newPassword, setNewPassword] = useState('user123')
+  const [newStallId, setNewStallId] = useState<number>(1)
+  const [newBalance, setNewBalance] = useState<number>(500)
+  const [createNewStallCheckbox, setCreateNewStallCheckbox] = useState(false)
+  const [newStallName, setNewStallName] = useState('')
+  const [newStallCode, setNewStallCode] = useState('')
+  const [newStallDesc, setNewStallDesc] = useState('')
+  const [adminUserModalError, setAdminUserModalError] = useState('')
+  const [adminUserModalSuccess, setAdminUserModalSuccess] = useState('')
+
+  // Admin Reset User Password Modal
+  const [adminResetUser, setAdminResetUser] = useState<Profile | null>(null)
+  const [adminResetNewPwd, setAdminResetNewPwd] = useState('')
+
+  // Logged-in Profile
+  const [currentUser, setCurrentUser] = useState<Profile>({
+    id: 'p-1',
+    student_id: '2025-01234',
+    full_name: 'Rommel Custodio',
+    grade_or_dept: 'Grade 12 - STEM',
+    role: 'student',
+    balance: 500.0,
+  })
+
+  // Navigation Tabs per Role
+  const [studentNavTab, setStudentNavTab] = useState<'menu' | 'active_ticket' | 'history'>('menu')
+  const [staffNavTab, setStaffNavTab] = useState<'kds' | 'menu_crud' | 'inventory_crud'>('kds')
+  const [branchNavTab, setBranchNavTab] = useState<'overview' | 'stall_1' | 'stall_2'>('overview')
+  const [adminNavTab, setAdminNavTab] = useState<'overview' | 'orders' | 'menu' | 'inventory' | 'users' | 'analytics' | 'audit' | 'sql'>('overview')
+
+  // Global Data
+  const [stalls, setStalls] = useState<Stall[]>([])
+  const [selectedStallFilter, setSelectedStallFilter] = useState<number | 'all'>('all')
+  const [items, setItems] = useState<MenuItem[]>([])
+  const [inventoryList, setInventoryList] = useState<InventoryItem[]>([])
+  const [allOrders, setAllOrders] = useState<OrderRecord[]>([])
+  const [activeOrder, setActiveOrder] = useState<OrderRecord | null>(null)
+  const [userProfiles, setUserProfiles] = useState<Profile[]>([])
+  const [auditLogList, setAuditLogList] = useState<AuditLog[]>([])
+  const [salesAnalytics, setSalesAnalytics] = useState<any[]>([])
+  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null)
+
+  // Student Cart & Filters
+  const [cart, setCart] = useState<Record<number, number>>({})
   const [cartOpen, setCartOpen] = useState(false)
   const [placed, setPlaced] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [category, setCategory] = useState('All')
+  const [query, setQuery] = useState('')
 
-  // Supabase states
-  const [items, setItems] = useState<MenuItem[]>(defaultItems)
-  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null)
-  const [activeOrder, setActiveOrder] = useState<OrderRecord>({
-    id: 'SB-2048',
-    student_id: '2025-01234',
-    student_name: 'Rommel',
-    items: [{ id: 1, name: 'Chicken Adobo', price: 75, quantity: 1 }],
-    subtotal: 75,
-    service_fee: 0,
-    total: 75,
-    status: 'Preparing',
-    pickup_time: '8–12 minutes',
-    payment_method: 'Cash at counter',
-    payment_status: 'pending',
-  })
+  // Staff CRUD Modal
+  const [itemModalOpen, setItemModalOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+  const [itemFormName, setItemFormName] = useState('')
+  const [itemFormDesc, setItemFormDesc] = useState('')
+  const [itemFormPrice, setItemFormPrice] = useState(75)
+  const [itemFormCategory, setItemFormCategory] = useState('Rice Meals')
+  const [itemFormStallId, setItemFormStallId] = useState(1)
+  const [itemFormPrepTime, setItemFormPrepTime] = useState(10)
+  const [itemFormImage, setItemFormImage] = useState('https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
+  const [itemFormAvailable, setItemFormAvailable] = useState(true)
 
-  // Load menu items and verify Supabase connection on mount
-  useEffect(() => {
-    async function initSupabase() {
-      try {
-        const test = await supabase.testConnection()
-        setSupabaseConnected(test.ok)
+  // Admin User Filter
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | UserRole>('all')
+  const [userSearchQuery, setUserSearchQuery] = useState('')
 
-        const menuData = await supabase.getMenuItems()
-        if (menuData && menuData.length > 0) {
-          setItems(menuData)
-        }
-      } catch (err) {
-        console.info('Using fallback menu items:', err)
-        setSupabaseConnected(true) // Supabase endpoint reached
-      }
+  // Sync data from Supabase
+  const refreshAllData = async () => {
+    try {
+      const conn = await canteenApi.system.verifyConnection()
+      setSupabaseConnected(conn.ok)
+
+      const [stallsData, menuData, invData, ordersData, profilesData, logsData, analyticsData] =
+        await Promise.all([
+          canteenApi.stalls.getStalls(),
+          canteenApi.menu.getItems(),
+          canteenApi.inventory.list(),
+          canteenApi.orders.list(),
+          canteenApi.auth.getProfiles(),
+          canteenApi.analytics.getAuditLogs(),
+          canteenApi.analytics.getSalesSummary(),
+        ])
+
+      setStalls(stallsData || [])
+      setItems(menuData || [])
+      setInventoryList(invData || [])
+      setAllOrders(ordersData || [])
+      setUserProfiles(profilesData || [])
+      setAuditLogList(logsData || [])
+      setSalesAnalytics(analyticsData || [])
+
+      const active = ordersData?.find(
+        o => o.order_status !== 'Completed' && o.order_status !== 'Cancelled'
+      )
+      if (active) setActiveOrder(active)
+    } catch (err) {
+      console.warn('Refresh notice:', err)
     }
-    initSupabase()
-  }, [])
+  }
 
-  // Poll for active order updates if Supabase is connected
   useEffect(() => {
-    if (!activeOrder?.id) return
+    refreshAllData()
+  }, [currentUser.role])
+
+  // Polling for live KDS and orders
+  useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const orders = await supabase.getOrders(studentId || '2025-01234')
-        const current = orders.find(o => o.id === activeOrder.id)
-        if (current && current.status !== activeOrder.status) {
-          setActiveOrder(current)
+        const [ordersData, invData] = await Promise.all([
+          canteenApi.orders.list(),
+          canteenApi.inventory.list(),
+        ])
+        if (ordersData) setAllOrders(ordersData)
+        if (invData) setInventoryList(invData)
+        if (activeOrder?.id) {
+          const current = ordersData?.find(o => o.id === activeOrder.id)
+          if (current && current.order_status !== activeOrder.order_status) {
+            setActiveOrder(current)
+          }
         }
-      } catch {
-        // Silently keep current state on poll error
-      }
-    }, 5000)
-
+      } catch {}
+    }, 4000)
     return () => clearInterval(interval)
-  }, [activeOrder?.id, studentId])
+  }, [activeOrder?.id])
 
+  // Select Role on Login Page
+  const handleSelectRole = (role: UserRole) => {
+    setChosenRole(role)
+    if (role === 'student') {
+      setStudentId('2025-01234')
+      setPassword('student123')
+    } else if (role === 'staff') {
+      setStudentId('STAFF-KITCHEN')
+      setPassword('staff123')
+    } else if (role === 'stall_manager') {
+      setStudentId('MGR-BRANCH')
+      setPassword('manager123')
+    } else if (role === 'admin') {
+      setStudentId('ADMIN-DBA')
+      setPassword('admin123')
+    }
+  }
+
+  // Handle Login
+  const handleSignIn = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!studentId.trim()) {
+      setAuthError('Please enter your School Email or Student ID.')
+      return
+    }
+
+    const profiles = await canteenApi.auth.getProfiles()
+    const matched = profiles.find(
+      p => p.student_id.toLowerCase() === studentId.trim().toLowerCase()
+    )
+
+    const resolvedUser: Profile = matched
+      ? { ...matched, role: chosenRole }
+      : {
+          id: `p-${Date.now()}`,
+          student_id: studentId.trim(),
+          full_name:
+            chosenRole === 'admin'
+              ? 'Engr. David Reyes (Lead DBA)'
+              : chosenRole === 'stall_manager'
+              ? 'Carlos Mendoza (Branch Manager)'
+              : chosenRole === 'staff'
+              ? 'Chef Maria Santos (Kitchen Staff)'
+              : 'Rommel Custodio (Student)',
+          grade_or_dept: chosenRole === 'student' ? 'Grade 12 - STEM A' : 'Campus Canteen Department',
+          role: chosenRole,
+          balance: chosenRole === 'admin' ? 5000 : chosenRole === 'stall_manager' ? 3500 : chosenRole === 'staff' ? 1200 : 500,
+        }
+
+    setCurrentUser(resolvedUser)
+    setLoggedIn(true)
+    setAuthError('')
+  }
+
+  // Handle Sign Up (Uses First Name, Middle Name, Last Name)
+  const handleSignUp = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!regFirstName.trim() || !regLastName.trim() || !regStudentId.trim() || !regPassword.trim()) {
+      setAuthError('Please fill in First Name, Last Name, ID, and Password.')
+      return
+    }
+
+    const fullName = `${regFirstName.trim()} ${regMiddleName.trim() ? regMiddleName.trim() + ' ' : ''}${regLastName.trim()}`.trim()
+
+    const newProfile = await canteenApi.auth.createProfile({
+      student_id: regStudentId.trim(),
+      first_name: regFirstName.trim(),
+      middle_name: regMiddleName.trim(),
+      last_name: regLastName.trim(),
+      full_name: fullName,
+      grade_or_dept: regDept.trim(),
+      role: 'student',
+      password: regPassword.trim(),
+      balance: 500.0,
+    })
+
+    setCurrentUser(newProfile)
+    setLoggedIn(true)
+    setAuthError('')
+    refreshAllData()
+  }
+
+  // Handle Change Password (for EVERY account)
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault()
+    setPwdError('')
+    setPwdSuccess('')
+
+    if (currentUser.password && currentPwd !== currentUser.password) {
+      setPwdError('Current password is incorrect.')
+      return
+    }
+    if (newPwd.length < 4) {
+      setPwdError('New password must be at least 4 characters.')
+      return
+    }
+    if (newPwd !== confirmPwd) {
+      setPwdError('New password and confirmation do not match.')
+      return
+    }
+
+    await canteenApi.auth.changePassword(currentUser.id, newPwd)
+    setCurrentUser(prev => ({ ...prev, password: newPwd }))
+    setPwdSuccess('✓ Password updated successfully!')
+    setTimeout(() => {
+      setChangePasswordModalOpen(false)
+      setCurrentPwd('')
+      setNewPwd('')
+      setConfirmPwd('')
+      setPwdSuccess('')
+    }, 1200)
+  }
+
+  // Admin Create User (Only Admin can create Stall Account, Admin Users, Staff Users, Customer Users)
+  const handleAdminCreateUser = async (e: FormEvent) => {
+    e.preventDefault()
+    setAdminUserModalError('')
+    setAdminUserModalSuccess('')
+
+    if (!newFirstName.trim() || !newLastName.trim() || !newUserId.trim()) {
+      setAdminUserModalError('Please enter First Name, Last Name, and User ID.')
+      return
+    }
+
+    let assignedStallId = newStallId
+
+    // If creating a brand new stall account or checked "Create New Stall"
+    if (newRole === 'stall_manager' && createNewStallCheckbox) {
+      if (!newStallName.trim()) {
+        setAdminUserModalError('Please enter Stall Name for the new stall account.')
+        return
+      }
+      const createdStall = await canteenApi.stalls.createStall({
+        name: newStallName.trim(),
+        stall_code: newStallCode.trim() || `STALL-${Math.floor(10 + Math.random() * 90)}`,
+        description: newStallDesc.trim() || 'New Campus Canteen Vendor Branch',
+        is_open: true,
+        rating: 4.8,
+      })
+      assignedStallId = createdStall.id
+    }
+
+    const fullName = `${newFirstName.trim()} ${newMiddleName.trim() ? newMiddleName.trim() + ' ' : ''}${newLastName.trim()}`.trim()
+
+    await canteenApi.auth.createProfile({
+      student_id: newUserId.trim(),
+      first_name: newFirstName.trim(),
+      middle_name: newMiddleName.trim(),
+      last_name: newLastName.trim(),
+      full_name: fullName,
+      grade_or_dept: newDept.trim(),
+      role: newRole,
+      stall_id: (newRole === 'staff' || newRole === 'stall_manager') ? assignedStallId : undefined,
+      password: newPassword.trim() || 'user123',
+      balance: Number(newBalance) || (newRole === 'admin' ? 5000 : newRole === 'staff' ? 1200 : 500),
+      is_active: true,
+    })
+
+    setAdminUserModalSuccess(`✓ Account created successfully for ${fullName} (${newRole})!`)
+    await refreshAllData()
+    setTimeout(() => {
+      setAdminCreateUserModalOpen(false)
+      setNewFirstName('')
+      setNewMiddleName('')
+      setNewLastName('')
+      setNewUserId('')
+      setNewPassword('user123')
+      setCreateNewStallCheckbox(false)
+      setNewStallName('')
+      setAdminUserModalSuccess('')
+    }, 1200)
+  }
+
+  // Admin Reset User Password
+  const handleAdminResetPassword = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!adminResetUser || !adminResetNewPwd.trim()) return
+    await canteenApi.auth.changePassword(adminResetUser.id, adminResetNewPwd.trim())
+    await refreshAllData()
+    alert(`Password reset for ${adminResetUser.full_name}!`)
+    setAdminResetUser(null)
+    setAdminResetNewPwd('')
+  }
+
+  // Handle Logout / Switch Role
+  const handleLogout = () => {
+    setLoggedIn(false)
+    setAuthStep('welcome')
+    setCart({})
+  }
+
+  // Student Ordering
   const categories = useMemo(() => {
-    const list = Array.from(new Set(items.map(item => item.category)))
+    const list = Array.from(new Set(items.map(item => item.category || 'General')))
     return ['All', ...list]
   }, [items])
 
-  const filtered = items.filter(
-    item =>
-      (category === 'All' || item.category === category) &&
-      item.name.toLowerCase().includes(query.toLowerCase())
-  )
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      const matchStall = selectedStallFilter === 'all' || item.stall_id === selectedStallFilter
+      const matchCat = category === 'All' || item.category === category
+      const matchQuery = item.name.toLowerCase().includes(query.toLowerCase())
+      return matchStall && matchCat && matchQuery
+    })
+  }, [items, selectedStallFilter, category, query])
 
   const count = Object.values(cart).reduce((sum, value) => sum + value, 0)
   const subtotal = useMemo(
@@ -228,17 +581,8 @@ export default function App() {
     [cart, items]
   )
 
-  const changeQty = (id: string | number, delta: number) =>
+  const changeQty = (id: number, delta: number) => {
     setCart(current => ({ ...current, [id]: Math.max(0, (current[id] || 0) + delta) }))
-
-  const handleLogin = (event: FormEvent) => {
-    event.preventDefault()
-    if (!studentId.trim() || !password.trim()) {
-      setLoginError('Enter your student ID and password to continue.')
-      return
-    }
-    setLoginError('')
-    setLoggedIn(true)
   }
 
   const handlePlaceOrder = async () => {
@@ -249,410 +593,2819 @@ export default function App() {
     const orderItems = items
       .filter(item => (cart[item.id] || 0) > 0)
       .map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
+        menu_item_id: item.id,
         quantity: cart[item.id],
+        unit_price: item.price,
       }))
 
-    const newOrder: OrderRecord = {
-      id: orderId,
-      student_id: studentId.trim() || '2025-01234',
-      student_name: 'Rommel',
-      items: orderItems,
-      subtotal,
-      service_fee: 0,
-      total: subtotal,
-      status: 'Order placed',
-      pickup_time: '8–12 minutes',
-      payment_method: 'Cash at counter',
-      payment_status: 'pending',
-    }
-
     try {
-      await supabase.createOrder(newOrder)
-    } catch (err) {
-      console.warn('Note: Stored order locally while Supabase table is syncing:', err)
-    }
+      const orderPayload = {
+        order_id: orderId,
+        student_id: currentUser.id,
+        stall_id: items.find(i => cart[i.id])?.stall_id || 1,
+        student_number: currentUser.student_id,
+        student_name: currentUser.full_name,
+        payment_method: 'Cash at counter',
+      }
 
-    setActiveOrder(newOrder)
-    setPlaced(true)
-    setIsSubmitting(false)
+      await canteenApi.orders.place(orderPayload, orderItems)
+      await refreshAllData()
+
+      const createdOrder: OrderRecord = {
+        id: orderId,
+        stall_id: orderPayload.stall_id,
+        student_number: orderPayload.student_number,
+        student_name: orderPayload.student_name,
+        subtotal,
+        service_fee: 0,
+        total_amount: subtotal,
+        order_status: 'Order placed',
+        pickup_time: '8–12 minutes',
+        payment_method: 'Cash at counter',
+        payment_status: 'pending',
+      }
+      setActiveOrder(createdOrder)
+      setPlaced(true)
+    } catch (err: any) {
+      alert(`Order error: ${err.message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
+  // Staff CRUD actions
+  const openEditModal = (item: MenuItem) => {
+    setEditingItem(item)
+    setItemFormName(item.name)
+    setItemFormDesc(item.description)
+    setItemFormPrice(item.price)
+    setItemFormCategory(item.category || 'Rice Meals')
+    setItemFormStallId(item.stall_id || 1)
+    setItemFormPrepTime(item.preparation_time_minutes || 10)
+    setItemFormImage(item.image_url)
+    setItemFormAvailable(item.is_available)
+    setItemModalOpen(true)
+  }
+
+  const openCreateModal = () => {
+    setEditingItem(null)
+    setItemFormName('')
+    setItemFormDesc('')
+    setItemFormPrice(75)
+    setItemFormCategory('Rice Meals')
+    setItemFormStallId(1)
+    setItemFormPrepTime(10)
+    setItemFormImage('https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
+    setItemFormAvailable(true)
+    setItemModalOpen(true)
+  }
+
+  const handleSaveMenuItem = async (e: FormEvent) => {
+    e.preventDefault()
+    try {
+      if (editingItem) {
+        await canteenApi.menu.updateItem(editingItem.id, {
+          name: itemFormName,
+          description: itemFormDesc,
+          price: itemFormPrice,
+          category: itemFormCategory,
+          stall_id: itemFormStallId,
+          preparation_time_minutes: itemFormPrepTime,
+          image_url: itemFormImage,
+          is_available: itemFormAvailable,
+        })
+      } else {
+        await canteenApi.menu.createItem({
+          category_id: 1,
+          name: itemFormName,
+          description: itemFormDesc,
+          price: itemFormPrice,
+          category: itemFormCategory,
+          stall_id: itemFormStallId,
+          preparation_time_minutes: itemFormPrepTime,
+          image_url: itemFormImage,
+          is_available: itemFormAvailable,
+          rating: '4.8',
+        })
+      }
+      setItemModalOpen(false)
+      refreshAllData()
+    } catch (err: any) {
+      alert(`CRUD Error: ${err.message}`)
+    }
+  }
+
+  const handleDeleteMenuItem = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this menu item?')) return
+    try {
+      await canteenApi.menu.deleteItem(id)
+      refreshAllData()
+    } catch (err: any) {
+      alert(`Delete error: ${err.message}`)
+    }
+  }
+
+  // Weekly sales summary calculations for Bar Chart
+  const weeklySalesData = useMemo(() => {
+    const days = [
+      { label: 'M', full: 'Mon', val: 320 },
+      { label: 'T', full: 'Tue', val: 540 },
+      { label: 'W', full: 'Wed', val: 780 },
+      { label: 'T', full: 'Thu', val: 610 },
+      { label: 'F', full: 'Fri', val: 890 },
+      { label: 'S', full: 'Sat', val: 210 },
+      { label: 'S', full: 'Sun', val: 90 },
+    ]
+    const maxVal = Math.max(...days.map(d => d.val))
+    return { days, maxVal }
+  }, [])
+
+  // =========================================================================
+  // VIEW 1: AUTHENTICATION FLOW (SCREENSHOT 1 & 2)
+  // =========================================================================
   if (!loggedIn) {
-    return (
-      <main className="login-page">
-        <section className="login-visual">
-          <div className="login-brand brand">
-            <span className="brand-mark">
-              <span />
-              <span />
-              <span />
-            </span>
-            <span>
-              Smart<span>Bite</span>
-            </span>
-          </div>
-          <div className="login-message">
-            <span className="login-kicker">YOUR BREAK, MADE BETTER</span>
-            <h1>
-              Good food.
-              <br />
-              Zero waiting.
-            </h1>
-            <p>Order ahead from your school canteen and spend less time in line.</p>
-          </div>
-          <div className="login-feature">
-            <span>
-              <Icon name="check" size={16} />
-            </span>
-            <div>
-              <strong>Freshly prepared</strong>
-              <small>Track your meal from order to pickup</small>
-            </div>
-          </div>
-          <p className="photo-credit">Photo by Patrick Amoy on Unsplash</p>
-        </section>
-        <section className="login-form-wrap">
-          <form className="login-form" onSubmit={handleLogin}>
-            <div className="mobile-login-brand brand">
-              <span className="brand-mark">
-                <span />
-                <span />
-                <span />
+    // 1A. WELCOME PAGE (SCREENSHOT 1)
+    if (authStep === 'welcome') {
+      return (
+        <div className="auth-page">
+          <div className="auth-card" style={{ maxWidth: '440px' }}>
+            <div className="auth-header">
+              <span className="eyebrow-chip">
+                <span className="sparkle">✳</span> YOUR CAMPUS, YOUR CANTEEN
               </span>
-              <span>
-                Smart<span>Bite</span>
-              </span>
+              <h1>Welcome to Smartbite.</h1>
+              <p>Order lunch ahead, keep up with your pickup, and make the most of your school day.</p>
             </div>
-            <p className="eyebrow">WELCOME BACK</p>
-            <h2>Sign in to SmartBite</h2>
-            <p className="login-subtitle">Enter your school account to order your next meal.</p>
-            <label>
-              <span>Student ID</span>
-              <div className="login-input">
-                <Icon name="receipt" size={18} />
-                <input
-                  autoFocus
-                  value={studentId}
-                  onChange={event => setStudentId(event.target.value)}
-                  placeholder="e.g. 2025-01234"
-                />
-              </div>
-            </label>
-            <label>
-              <span>Password</span>
-              <div className="login-input">
-                <Icon name="clock" size={18} />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={event => setPassword(event.target.value)}
-                  placeholder="Enter your password"
-                />
-              </div>
-            </label>
-            <div className="login-options">
-              <label>
-                <input type="checkbox" /> <span>Remember me</span>
-              </label>
-              <button type="button">Forgot password?</button>
-            </div>
-            {loginError && <p className="login-error">{loginError}</p>}
-            <button className="login-submit" type="submit">
-              Sign in <Icon name="arrow" size={18} />
+
+            <button
+              className="auth-btn-primary"
+              onClick={() => {
+                setAuthStep('signin')
+                setAuthError('')
+              }}
+            >
+              Sign in to continue <span>&rarr;</span>
             </button>
-            <p className="register-copy">
-              New to SmartBite? <button type="button">Create an account</button>
-            </p>
+
+            {/* Feature bullets matching Screenshot 1 */}
+            <div className="welcome-features">
+              <div className="welcome-feature-item">
+                <div className="welcome-feature-icon">
+                  <Icon name="bag" size={20} />
+                </div>
+                <div className="welcome-feature-text">
+                  <strong>Order ahead</strong>
+                  <span>Choose your lunch before the break</span>
+                </div>
+              </div>
+              <div className="welcome-feature-item">
+                <div className="welcome-feature-icon">
+                  <Icon name="clock" size={20} />
+                </div>
+                <div className="welcome-feature-text">
+                  <strong>Know when to pick up</strong>
+                  <span>Stay up to date on your order</span>
+                </div>
+              </div>
+            </div>
+
+            {/* School Footer Pill */}
+            <div className="school-footer-pill">
+              <span className="school-badge-mini">HNU</span>
+              <span>Holy Name University &bull; School canteen portal</span>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // 1B. SIGN IN PAGE (SCREENSHOT 2)
+    if (authStep === 'signin') {
+      return (
+        <div className="auth-page">
+          <div className="auth-card" style={{ maxWidth: '460px' }}>
+            <button
+              className="auth-back-link"
+              onClick={() => {
+                setAuthStep('welcome')
+                setAuthError('')
+              }}
+            >
+              <span>&larr;</span> Back to welcome
+            </button>
+
+            <div className="auth-header">
+              <span className="eyebrow-chip">
+                <span className="sparkle">✳</span> WELCOME TO YOUR CANTEEN
+              </span>
+              <h1>Good to have you.</h1>
+              <p>Sign in to make your next school lunch a little easier.</p>
+            </div>
+
+            {/* Segmented Role Selector */}
+            <div className="role-segmented-wrap">
+              <span className="role-segmented-label">I'm signing in as</span>
+              <div className="role-segmented-grid">
+                <button
+                  type="button"
+                  className={`role-segmented-btn ${chosenRole === 'student' ? 'active' : ''}`}
+                  onClick={() => handleSelectRole('student')}
+                >
+                  <span className="role-icon">🧑‍🤝‍🧑</span>
+                  <span>Student</span>
+                </button>
+                <button
+                  type="button"
+                  className={`role-segmented-btn ${chosenRole === 'staff' ? 'active' : ''}`}
+                  onClick={() => handleSelectRole('staff')}
+                >
+                  <span className="role-icon">👜</span>
+                  <span>Staff</span>
+                </button>
+                <button
+                  type="button"
+                  className={`role-segmented-btn ${chosenRole === 'admin' ? 'active' : ''}`}
+                  onClick={() => handleSelectRole('admin')}
+                >
+                  <span className="role-icon">🪟</span>
+                  <span>Admin</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sign In Form */}
+            <form onSubmit={handleSignIn}>
+              <div className="auth-field">
+                <div className="auth-field-header">
+                  <span className="auth-field-label">School Email or User ID</span>
+                </div>
+                <div className="auth-input-box">
+                  <input
+                    type="text"
+                    value={studentId}
+                    onChange={e => setStudentId(e.target.value)}
+                    placeholder="e.g. 2025-01234 or email@hnu.edu.ph"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="auth-field">
+                <div className="auth-field-header">
+                  <span className="auth-field-label">Password</span>
+                  <button
+                    type="button"
+                    className="auth-forgot-link"
+                    onClick={() => alert('Password reset: please contact your campus canteen administrator.')}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="auth-input-box">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-toggle-pwd"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={17} />
+                  </button>
+                </div>
+              </div>
+
+              {authError && <div className="auth-error-pill">{authError}</div>}
+
+              <button className="auth-btn-primary" type="submit">
+                Sign in <span>&rarr;</span>
+              </button>
+            </form>
+
+            {/* Peach Callout Box matching Screenshot 2 */}
+            <div className="auth-callout-notice">
+              <span className="notice-icon">✳</span>
+              <span>Staff and administrators sign in with accounts provided by the canteen administrator.</span>
+            </div>
+
+            {/* New student link */}
+            <div className="auth-switch-link">
+              New student?
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthStep('signup')
+                  setAuthError('')
+                }}
+              >
+                Create an account
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // 1C. SIGN UP PAGE (CREATE ACCOUNT)
+    return (
+      <div className="auth-page">
+        <div className="auth-card" style={{ maxWidth: '460px' }}>
+          <button
+            className="auth-back-link"
+            onClick={() => {
+              setAuthStep('signin')
+              setAuthError('')
+            }}
+          >
+            <span>&larr;</span> Back to sign in
+          </button>
+
+          <div className="auth-header">
+            <span className="eyebrow-chip">
+              <span className="sparkle">✳</span> NEW STUDENT REGISTRATION
+            </span>
+            <h1>Create an account.</h1>
+            <p>Join Smartbite to order lunch ahead and skip the campus line.</p>
+          </div>
+
+          <form onSubmit={handleSignUp}>
+            <div className="auth-field">
+              <span className="auth-field-label">Student Name (First, Middle, Last)</span>
+              <div className="name-inputs-row" style={{ marginTop: '7px' }}>
+                <div className="auth-input-box">
+                  <input
+                    value={regFirstName}
+                    onChange={e => setRegFirstName(e.target.value)}
+                    placeholder="First Name *"
+                    required
+                  />
+                </div>
+                <div className="auth-input-box">
+                  <input
+                    value={regMiddleName}
+                    onChange={e => setRegMiddleName(e.target.value)}
+                    placeholder="Middle Name"
+                  />
+                </div>
+                <div className="auth-input-box">
+                  <input
+                    value={regLastName}
+                    onChange={e => setRegLastName(e.target.value)}
+                    placeholder="Last Name *"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="auth-field">
+              <span className="auth-field-label">Student ID Number</span>
+              <div className="auth-input-box" style={{ marginTop: '7px' }}>
+                <input
+                  value={regStudentId}
+                  onChange={e => setRegStudentId(e.target.value)}
+                  placeholder="e.g. 2025-09876"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="auth-field">
+              <span className="auth-field-label">Grade Level / Department</span>
+              <div className="auth-input-box" style={{ marginTop: '7px' }}>
+                <input
+                  value={regDept}
+                  onChange={e => setRegDept(e.target.value)}
+                  placeholder="e.g. Grade 12 - STEM"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="auth-field">
+              <span className="auth-field-label">Password</span>
+              <div className="auth-input-box" style={{ marginTop: '7px' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={regPassword}
+                  onChange={e => setRegPassword(e.target.value)}
+                  placeholder="Choose a password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-toggle-pwd"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  <Icon name={showPassword ? 'eye-off' : 'eye'} size={17} />
+                </button>
+              </div>
+            </div>
+
+            {authError && <div className="auth-error-pill">{authError}</div>}
+
+            <button className="auth-btn-primary" type="submit">
+              Create account &amp; enter <span>&rarr;</span>
+            </button>
           </form>
-          <p className="login-help">Having trouble signing in? Contact your school administrator.</p>
-        </section>
-      </main>
+
+          <div className="auth-switch-link">
+            Already have an account?
+            <button
+              type="button"
+              onClick={() => {
+                setAuthStep('signin')
+                setAuthError('')
+              }}
+            >
+              Sign in
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
-  const orderStepIndex =
-    activeOrder.status === 'Ready for pickup' || activeOrder.status === 'Completed'
-      ? 2
-      : activeOrder.status === 'Preparing'
-      ? 1
-      : 0
-
+  // =========================================================================
+  // AUTHENTICATED DASHBOARD SHELL (MATCHING SCREENSHOTS 3 & 4)
+  // Left Sidebar (~260px) + Topbar + Main Viewport
+  // =========================================================================
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#">
-          <span className="brand-mark">
-            <span />
-            <span />
-            <span />
-          </span>
-          <span>
-            Smart<span>Bite</span>
-          </span>
-        </a>
-        <nav className="desktop-nav" aria-label="Main navigation">
-          <a className="active" href="#">
-            <Icon name="home" size={18} /> Menu
-          </a>
-          <a href="#orders">
-            <Icon name="receipt" size={18} /> My Orders
-          </a>
-          <a href="#history">
-            <Icon name="clock" size={18} /> History
-          </a>
-        </nav>
-        <div className="header-actions">
-          {/* Supabase Status Indicator */}
-          <div
-            className={`supabase-pill ${supabaseConnected === false ? 'offline' : ''}`}
-            title="Connected to Supabase"
-          >
-            <i />
-            <span>Supabase Connected</span>
-          </div>
-
-          <button className="icon-button" aria-label="Notifications">
-            <Icon name="bell" />
-          </button>
-          <button className="cart-button" onClick={() => setCartOpen(true)}>
-            <Icon name="bag" /> <span>My Cart</span>
-            {count > 0 && <b>{count}</b>}
-          </button>
-          <button className="avatar" onClick={() => setLoggedIn(false)} title="Sign out">
-            RC
-          </button>
-          <button className="profile" onClick={() => setLoggedIn(false)} title="Sign out">
-            <strong>Rommel</strong>
-            <span>Student · Grade 12</span>
-          </button>
+    <div className="app-layout">
+      {/* 2A. LEFT SIDEBAR */}
+      <aside className="app-sidebar">
+        {/* Brand Header */}
+        <div className="sidebar-brand-row">
+          <div className="sidebar-logo-badge">S</div>
+          <span className="sidebar-brand-name">Smartbite</span>
         </div>
-      </header>
 
-      <main>
-        <section className="welcome">
-          <div>
-            <p className="eyebrow">GOOD MORNING, ROMMEL</p>
-            <h1>What are you craving today?</h1>
-            <p>Order ahead, skip the line, and enjoy your break.</p>
-          </div>
-          <div className="service-pill">
-            <span className="pulse" />
-            <div>
-              <strong>Canteen is open</strong>
-              <small>Orders accepted until 3:30 PM</small>
+        {/* School Selector Card matching Screenshot 3 & 4 */}
+        <div className="sidebar-school-wrap">
+          <div className="sidebar-section-kicker">YOUR SCHOOL</div>
+          <div className="sidebar-school-card">
+            <div className="school-badge-square">HNU</div>
+            <div className="school-info-text">
+              <strong>Holy Name University</strong>
+              <small>Campus canteen</small>
             </div>
+            <Icon name="chevron-down" size={16} />
           </div>
-        </section>
+        </div>
 
-        <section className="order-card" id="orders">
-          <div className="order-icon">
-            <Icon name="receipt" size={25} />
-          </div>
-          <div className="order-copy">
-            <span>
-              ACTIVE ORDER <b>{activeOrder.id}</b>
-            </span>
-            <h3>
-              {activeOrder.status === 'Order placed'
-                ? 'Order confirmed by canteen'
-                : activeOrder.status === 'Preparing'
-                ? 'Your order is being prepared'
-                : activeOrder.status === 'Ready for pickup'
-                ? 'Your order is ready for pickup!'
-                : 'Order completed'}
-            </h3>
-            <p>Estimated pickup in {activeOrder.pickup_time || '8–12 minutes'}</p>
-          </div>
-          <div className="steps" aria-label="Order progress">
-            {['Order placed', 'Preparing', 'Ready for pickup'].map((label, index) => (
-              <div className={`step ${index <= orderStepIndex ? 'done' : ''}`} key={label}>
-                <i>{index <= orderStepIndex ? <Icon name="check" size={14} /> : index + 1}</i>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-          <button className="details-button">
-            View details <Icon name="arrow" size={17} />
-          </button>
-        </section>
+        {/* Section Navigation according to Role */}
+        <div className="sidebar-section-kicker">
+          {currentUser.role === 'admin'
+            ? 'ADMINISTRATION'
+            : currentUser.role === 'staff'
+            ? 'KITCHEN OPERATIONS'
+            : currentUser.role === 'stall_manager'
+            ? 'BRANCH OPERATIONS'
+            : 'STUDENT SERVICES'}
+        </div>
 
-        <section className="menu-section">
-          <div className="menu-heading">
-            <div>
-              <p className="eyebrow">TODAY'S MENU</p>
-              <h2>Made fresh for you</h2>
-            </div>
-            <label className="search">
-              <Icon name="search" size={19} />
-              <input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search the menu..."
-              />
-            </label>
-          </div>
-          <div className="categories">
-            {categories.map(cat => (
+        <nav className="sidebar-nav-list">
+          {/* ADMIN ROLE NAVIGATION */}
+          {currentUser.role === 'admin' && (
+            <>
               <button
-                key={cat}
-                className={category === cat ? 'active' : ''}
-                onClick={() => setCategory(cat)}
+                className={`sidebar-nav-btn ${adminNavTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('overview')}
               >
-                {cat}
+                <Icon name="grid" size={17} />
+                <span>Admin dashboard</span>
               </button>
-            ))}
+              <button
+                className={`sidebar-nav-btn ${adminNavTab === 'orders' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('orders')}
+              >
+                <Icon name="receipt" size={17} />
+                <span>Orders</span>
+                <span className="nav-badge">{allOrders.length}</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${adminNavTab === 'menu' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('menu')}
+              >
+                <Icon name="bag" size={17} />
+                <span>Menu</span>
+                <span className="nav-badge">{items.length}</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${adminNavTab === 'inventory' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('inventory')}
+              >
+                <Icon name="store" size={17} />
+                <span>Inventory</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${adminNavTab === 'users' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('users')}
+              >
+                <Icon name="users" size={17} />
+                <span>Team / Users</span>
+                <span className="nav-badge">{userProfiles.length}</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${adminNavTab === 'sql' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('sql')}
+              >
+                <Icon name="database" size={17} />
+                <span>SQL Studio</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${adminNavTab === 'audit' ? 'active' : ''}`}
+                onClick={() => setAdminNavTab('audit')}
+              >
+                <Icon name="shield" size={17} />
+                <span>Audit Trail</span>
+              </button>
+            </>
+          )}
+
+          {/* STAFF ROLE NAVIGATION */}
+          {currentUser.role === 'staff' && (
+            <>
+              <button
+                className={`sidebar-nav-btn ${staffNavTab === 'kds' ? 'active' : ''}`}
+                onClick={() => setStaffNavTab('kds')}
+              >
+                <Icon name="chef" size={17} />
+                <span>Live KDS Queue</span>
+                <span className="nav-badge">{allOrders.filter(o => o.order_status !== 'Completed').length}</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${staffNavTab === 'menu_crud' ? 'active' : ''}`}
+                onClick={() => setStaffNavTab('menu_crud')}
+              >
+                <Icon name="edit" size={17} />
+                <span>Menu Items CRUD</span>
+                <span className="nav-badge">{items.length}</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${staffNavTab === 'inventory_crud' ? 'active' : ''}`}
+                onClick={() => setStaffNavTab('inventory_crud')}
+              >
+                <Icon name="store" size={17} />
+                <span>Ingredient Stocks</span>
+              </button>
+            </>
+          )}
+
+          {/* MINI STALL ROLE NAVIGATION */}
+          {currentUser.role === 'stall_manager' && (
+            <>
+              <button
+                className={`sidebar-nav-btn ${branchNavTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setBranchNavTab('overview')}
+              >
+                <Icon name="store" size={17} />
+                <span>2 Branches Overview</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${branchNavTab === 'stall_1' ? 'active' : ''}`}
+                onClick={() => setBranchNavTab('stall_1')}
+              >
+                <Icon name="home" size={17} />
+                <span>Branch #1: Main Kitchen</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${branchNavTab === 'stall_2' ? 'active' : ''}`}
+                onClick={() => setBranchNavTab('stall_2')}
+              >
+                <Icon name="store" size={17} />
+                <span>Branch #2: Snack Bar</span>
+              </button>
+            </>
+          )}
+
+          {/* STUDENT ROLE NAVIGATION */}
+          {currentUser.role === 'student' && (
+            <>
+              <button
+                className={`sidebar-nav-btn ${studentNavTab === 'menu' ? 'active' : ''}`}
+                onClick={() => setStudentNavTab('menu')}
+              >
+                <Icon name="home" size={17} />
+                <span>Food Catalog</span>
+              </button>
+              <button
+                className={`sidebar-nav-btn ${studentNavTab === 'active_ticket' ? 'active' : ''}`}
+                onClick={() => setStudentNavTab('active_ticket')}
+              >
+                <Icon name="receipt" size={17} />
+                <span>Active Ticket</span>
+                {activeOrder && <span className="nav-badge alert">LIVE</span>}
+              </button>
+              <button
+                className={`sidebar-nav-btn ${studentNavTab === 'history' ? 'active' : ''}`}
+                onClick={() => setStudentNavTab('history')}
+              >
+                <Icon name="clock" size={17} />
+                <span>Order History</span>
+              </button>
+            </>
+          )}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="sidebar-footer">
+          <div className="sidebar-user-chip">
+            <div className="user-avatar-circle">
+              {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div className="user-chip-meta">
+              <strong>{currentUser.full_name}</strong>
+              <small>{currentUser.role.replace('_', ' ')} &bull; ₱{currentUser.balance}.00</small>
+            </div>
           </div>
-          <div className="menu-grid">
-            {filtered.map(item => {
-              const qty = cart[item.id] || 0
-              return (
-                <article className="food-card" key={item.id}>
-                  <div className="food-image">
-                    <img src={item.image} alt={item.name} />
-                    <span className="available">
-                      <i /> Available
-                    </span>
-                    <span className="rating">★ {item.rating}</span>
-                  </div>
-                  <div className="food-info">
-                    <span className="food-category">{item.category}</span>
-                    <h3>{item.name}</h3>
-                    <p>{item.description}</p>
-                    <div className="food-footer">
-                      <strong>
-                        ₱{item.price}
-                        <small>.00</small>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              className="sidebar-signout-btn"
+              onClick={() => {
+                setChangePasswordModalOpen(true)
+                setPwdError('')
+                setPwdSuccess('')
+              }}
+              style={{ flex: 1 }}
+              title="Change Account Password"
+            >
+              <Icon name="key" size={13} />
+              <span>Password</span>
+            </button>
+            <button className="sidebar-signout-btn" onClick={handleLogout} style={{ flex: 1 }} title="Switch Role / Sign Out">
+              <Icon name="logout" size={13} />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* 2B. MAIN VIEWPORT */}
+      <div className="app-main-viewport">
+        {/* Topbar */}
+        <header className="app-topbar">
+          <div className="topbar-breadcrumb">
+            <span>Holy Name University</span>
+            <span>/</span>
+            <strong>
+              {currentUser.role === 'admin'
+                ? 'Admin dashboard'
+                : currentUser.role === 'staff'
+                ? 'Kitchen operations'
+                : currentUser.role === 'stall_manager'
+                ? 'Branch manager'
+                : 'Student canteen'}
+            </strong>
+          </div>
+
+          <div className="topbar-actions">
+            {/* Live Open Status Pill */}
+            <div className="status-pill-open">
+              <span className="live-dot" />
+              <span>Canteen open &bull; start 6:00 AM until 6:00 PM</span>
+            </div>
+
+            {/* Supabase Status */}
+            {supabaseConnected !== null && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '5px 10px',
+                  borderRadius: '20px',
+                  background: supabaseConnected ? '#DCFCE7' : '#FEE2E2',
+                  color: supabaseConnected ? '#15803D' : '#991B1B',
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: supabaseConnected ? '#22C55E' : '#EF4444',
+                  }}
+                />
+                <span>{supabaseConnected ? 'Supabase Live' : 'Supabase Offline'}</span>
+              </div>
+            )}
+
+            {/* Cart Button for Students */}
+            {currentUser.role === 'student' && (
+              <button className="cart-top-btn" onClick={() => setCartOpen(true)}>
+                <Icon name="bag" size={16} />
+                <span>Cart</span>
+                {count > 0 && <b>{count}</b>}
+              </button>
+            )}
+
+            <button
+              className="icon-action-btn"
+              onClick={() => {
+                setChangePasswordModalOpen(true)
+                setPwdError('')
+                setPwdSuccess('')
+              }}
+              title="Change Account Password"
+            >
+              <Icon name="key" size={17} />
+            </button>
+
+            <button className="icon-action-btn" title="Notifications">
+              <Icon name="bell" size={17} />
+            </button>
+            <button className="icon-action-btn" onClick={refreshAllData} title="Refresh System">
+              <Icon name="refresh" size={17} />
+            </button>
+            <button className="icon-action-btn" onClick={handleLogout} title="Exit">
+              <Icon name="logout" size={17} />
+            </button>
+          </div>
+        </header>
+
+        {/* Scrollable Main Content */}
+        <div className="main-content-scroll">
+          {/* ===============================================================
+              DASHBOARD 1: ADMIN ROLE (SCREENSHOTS 3 & 4)
+              =============================================================== */}
+          {currentUser.role === 'admin' && (
+            <>
+              {/* Header matching Screenshot 3 & 4 */}
+              <div className="dashboard-header">
+                <div className="dashboard-header-text">
+                  <span className="eyebrow-chip">
+                    <span className="sparkle">✳</span> HOLY NAME UNIVERSITY &bull; SCHOOL ADMIN
+                  </span>
+                  <h1>Your school, at a glance.</h1>
+                  <p>A clear view of canteen operations across your campus.</p>
+                </div>
+                <span className="role-badge-tag">ADMIN ACCESS</span>
+              </div>
+
+              {/* OVERVIEW SUB-VIEW (EXACT SCREENSHOT 3 & 4) */}
+              {adminNavTab === 'overview' && (
+                <>
+                  {/* 4 Stat Cards in a row */}
+                  <div className="stats-cards-grid">
+                    <div className="stat-card-item">
+                      <span className="stat-card-label">Orders today</span>
+                      <strong className="stat-card-val">{allOrders.length}</strong>
+                      <span className="stat-card-sub">Orders placed today</span>
+                    </div>
+                    <div className="stat-card-item">
+                      <span className="stat-card-label">Sales today</span>
+                      <strong className="stat-card-val">
+                        ₱
+                        {allOrders
+                          .filter(o => o.order_status === 'Completed' || o.order_status === 'Ready for pickup')
+                          .reduce((sum, o) => sum + Number(o.total_amount), 0)}
+                        .00
                       </strong>
-                      {qty ? (
-                        <div className="quantity">
-                          <button
-                            onClick={() => changeQty(item.id, -1)}
-                            aria-label={`Remove one ${item.name}`}
-                          >
-                            <Icon name="minus" size={16} />
-                          </button>
-                          <span>{qty}</span>
-                          <button
-                            onClick={() => changeQty(item.id, 1)}
-                            aria-label={`Add one ${item.name}`}
-                          >
-                            <Icon name="plus" size={16} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button className="add-button" onClick={() => changeQty(item.id, 1)}>
-                          <Icon name="plus" size={17} /> Add
-                        </button>
-                      )}
+                      <span className="stat-card-sub">Excludes cancelled orders</span>
+                    </div>
+                    <div className="stat-card-item">
+                      <span className="stat-card-label">Active students</span>
+                      <strong className="stat-card-val">
+                        {userProfiles.filter(u => u.role === 'student').length || 1}
+                      </strong>
+                      <span className="stat-card-sub">With canteen access</span>
+                    </div>
+                    <div className="stat-card-item">
+                      <span className="stat-card-label">Canteen team</span>
+                      <strong className="stat-card-val">
+                        {userProfiles.filter(u => u.role !== 'student').length || 5}
+                      </strong>
+                      <span className="stat-card-sub">Active staff and admins</span>
                     </div>
                   </div>
-                </article>
-              )
-            })}
-          </div>
-          {!filtered.length && <div className="empty">No menu items match your search.</div>}
-        </section>
-      </main>
 
-      <footer>
-        <div className="brand footer-brand">
-          <span className="brand-mark">
-            <span />
-            <span />
-            <span />
-          </span>
-          <span>
-            Smart<span>Bite</span>
-          </span>
-        </div>
-        <p>Good food. Less waiting. More time for what matters.</p>
-        <span>© 2025 SmartBite · School Canteen</span>
-      </footer>
+                  {/* Action Shortcuts matching Screenshot 3 & 4 */}
+                  <div className="shortcuts-row">
+                    <div className="shortcut-card" onClick={() => setAdminNavTab('orders')}>
+                      <div className="shortcut-meta">
+                        <strong>Order activity</strong>
+                        <span>{allOrders.filter(o => o.order_status !== 'Completed').length} orders need attention</span>
+                      </div>
+                      <span className="shortcut-arrow">&rarr;</span>
+                    </div>
+                    <div className="shortcut-card" onClick={() => setAdminNavTab('users')}>
+                      <div className="shortcut-meta">
+                        <strong>Staff directory</strong>
+                        <span>Review canteen team access</span>
+                      </div>
+                      <span className="shortcut-arrow">&rarr;</span>
+                    </div>
+                    <div className="shortcut-card" onClick={() => setAdminNavTab('menu')}>
+                      <div className="shortcut-meta">
+                        <strong>Menu availability</strong>
+                        <span>{items.filter(i => i.is_available).length} items available today</span>
+                      </div>
+                      <span className="shortcut-arrow">&rarr;</span>
+                    </div>
+                  </div>
 
-      {cartOpen && (
-        <div className="overlay" onMouseDown={() => setCartOpen(false)}>
-          <aside className="cart-panel" onMouseDown={e => e.stopPropagation()}>
-            <div className="cart-title">
-              <div>
-                <p className="eyebrow">YOUR ORDER</p>
-                <h2>{placed ? 'Order confirmed' : 'My Cart'}</h2>
+                  {/* Two-Column Grid: Chart & Latest Orders (Left) + Campus Profile (Right) */}
+                  <div className="dashboard-2col-grid">
+                    {/* Left Column */}
+                    <div>
+                      {/* Weekly Canteen Sales Card */}
+                      <div className="card-panel">
+                        <div className="card-panel-header">
+                          <div>
+                            <h3>Weekly canteen sales</h3>
+                            <p>Monday to Friday</p>
+                          </div>
+                          <strong style={{ fontSize: '12px', color: 'var(--muted)' }}>Week summary</strong>
+                        </div>
+                        <div className="sales-chart-wrap">
+                          <span className="sales-chart-total">
+                            ₱
+                            {salesAnalytics.reduce((sum, a) => sum + Number(a.total_revenue || 0), 0) || '1,420'}
+                            .00
+                          </span>
+                          <div className="sales-bars-row">
+                            {weeklySalesData.days.map((d, idx) => {
+                              const heightPct = Math.round((d.val / weeklySalesData.maxVal) * 100)
+                              return (
+                                <div className="sales-bar-col" key={idx}>
+                                  <div className="bar-track">
+                                    <div className="bar-fill" style={{ height: `${heightPct}%` }} />
+                                  </div>
+                                  <span className="bar-label">{d.label}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Latest Canteen Orders Table */}
+                      <div className="card-panel">
+                        <div className="card-panel-header">
+                          <div>
+                            <h3>Latest canteen orders</h3>
+                            <p>Real-time orders across all branches</p>
+                          </div>
+                          <button
+                            className="btn-secondary"
+                            onClick={() => setAdminNavTab('orders')}
+                            style={{ fontSize: '11px', padding: '4px 10px' }}
+                          >
+                            View all &rarr;
+                          </button>
+                        </div>
+                        <div className="data-table-wrap">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>ORDER</th>
+                                <th>ITEMS</th>
+                                <th>TIME</th>
+                                <th>TOTAL</th>
+                                <th>STATUS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allOrders.slice(0, 5).map(ord => (
+                                <tr key={ord.id}>
+                                  <td><strong>#{ord.id}</strong></td>
+                                  <td>
+                                    {ord.order_items?.map(i => `${i.item_name} (x${i.quantity})`).join(', ') ||
+                                      'Canteen meal package'}
+                                  </td>
+                                  <td style={{ color: 'var(--muted)' }}>
+                                    {ord.pickup_time || '8–12 min'}
+                                  </td>
+                                  <td><strong>₱{ord.total_amount}.00</strong></td>
+                                  <td>
+                                    <span
+                                      className={`status-pill ${
+                                        ord.order_status === 'Ready for pickup'
+                                          ? 'ready'
+                                          : ord.order_status === 'Preparing'
+                                          ? 'preparing'
+                                          : ord.order_status === 'Completed'
+                                          ? 'completed'
+                                          : 'pending'
+                                      }`}
+                                    >
+                                      {ord.order_status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Campus Profile Card */}
+                    <div>
+                      <div className="campus-profile-card">
+                        <div className="campus-profile-top">
+                          <span className="sidebar-section-kicker" style={{ margin: 0 }}>CAMPUS PROFILE</span>
+                          <span className="campus-badge-active">ACTIVE</span>
+                        </div>
+                        <div className="campus-profile-title">
+                          <div className="school-badge-square" style={{ width: '44px', height: '44px', fontSize: '14px' }}>
+                            HNU
+                          </div>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '15px' }}>Holy Name University</strong>
+                            <small style={{ color: 'var(--muted)' }}>School canteen</small>
+                          </div>
+                        </div>
+                        <div className="campus-profile-meta">
+                          <div className="campus-meta-row">
+                            <span>Campus code</span>
+                            <strong>HNU-TAGB</strong>
+                          </div>
+                          <div className="campus-meta-row">
+                            <span>Location</span>
+                            <strong>Main Campus, Dampas</strong>
+                          </div>
+                          <div className="campus-meta-row">
+                            <span>Operating hours</span>
+                            <strong>6:00 AM &ndash; 6:00 PM</strong>
+                          </div>
+                          <div className="campus-meta-row">
+                            <span>Payment support</span>
+                            <strong>Cash &bull; Student Balance</strong>
+                          </div>
+                          <div className="campus-meta-row">
+                            <span>PostgreSQL 15</span>
+                            <strong style={{ color: 'var(--primary)' }}>3NF &bull; 10 Tables</strong>
+                          </div>
+                          <div className="campus-meta-row">
+                            <span>Cloud Backend</span>
+                            <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                              zkarmieyteouuvzhojrv
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ADMIN TAB 2: ORDERS MANAGEMENT */}
+              {adminNavTab === 'orders' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>All Campus Canteen Orders ({allOrders.length})</h3>
+                      <p>Filter, inspect, and update student order tickets</p>
+                    </div>
+                    <button className="btn-secondary" onClick={refreshAllData}>
+                      <Icon name="refresh" size={14} /> Refresh Orders
+                    </button>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Order ID</th>
+                          <th>Student Name</th>
+                          <th>ID Number</th>
+                          <th>Items Ordered</th>
+                          <th>Branch</th>
+                          <th>Total Amount</th>
+                          <th>Payment Method</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allOrders.map(ord => (
+                          <tr key={ord.id}>
+                            <td><code>#{ord.id}</code></td>
+                            <td><strong>{ord.student_name}</strong></td>
+                            <td>{ord.student_number}</td>
+                            <td>
+                              {ord.order_items?.map(i => `${i.item_name} (x${i.quantity})`).join(', ') || 'Package'}
+                            </td>
+                            <td>{stalls.find(s => s.id === ord.stall_id)?.name || `Stall #${ord.stall_id}`}</td>
+                            <td><strong>₱{ord.total_amount}.00</strong></td>
+                            <td>{ord.payment_method}</td>
+                            <td>
+                              <span
+                                className={`status-pill ${
+                                  ord.order_status === 'Ready for pickup'
+                                    ? 'ready'
+                                    : ord.order_status === 'Preparing'
+                                    ? 'preparing'
+                                    : ord.order_status === 'Completed'
+                                    ? 'completed'
+                                    : 'pending'
+                                }`}
+                              >
+                                {ord.order_status}
+                              </span>
+                            </td>
+                            <td>
+                              <select
+                                value={ord.order_status}
+                                onChange={async e => {
+                                  await canteenApi.orders.updateStatus(ord.id, e.target.value as any)
+                                  refreshAllData()
+                                }}
+                                style={{
+                                  border: '1px solid var(--line)',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <option value="Order placed">Order placed</option>
+                                <option value="Preparing">Preparing</option>
+                                <option value="Ready for pickup">Ready for pickup</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ADMIN TAB 3: MENU INSPECTOR */}
+              {adminNavTab === 'menu' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Campus Menu Catalog ({items.length} items)</h3>
+                      <p>Current offerings across all canteen stalls</p>
+                    </div>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Dish</th>
+                          <th>Branch</th>
+                          <th>Category</th>
+                          <th>Price</th>
+                          <th>Prep Time</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map(item => (
+                          <tr key={item.id}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <img
+                                  src={item.image_url}
+                                  alt=""
+                                  style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }}
+                                />
+                                <div>
+                                  <strong>{item.name}</strong>
+                                  <small style={{ display: 'block', color: 'var(--muted)', fontSize: '11px' }}>
+                                    {item.description}
+                                  </small>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{stalls.find(s => s.id === item.stall_id)?.name || `Stall #${item.stall_id}`}</td>
+                            <td>{item.category}</td>
+                            <td><strong>₱{item.price}.00</strong></td>
+                            <td>{item.preparation_time_minutes} mins</td>
+                            <td>
+                              <span className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}>
+                                {item.is_available ? 'Available' : 'Sold Out'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ADMIN TAB 4: INVENTORY INSPECTOR */}
+              {adminNavTab === 'inventory' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Ingredient Stock Levels</h3>
+                      <p>PostgreSQL tracked canteen inventory balances</p>
+                    </div>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Ingredient</th>
+                          <th>Branch</th>
+                          <th>Stock Balance</th>
+                          <th>Minimum Safe Level</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inventoryList.map(inv => {
+                          const isLow = Number(inv.current_stock) <= Number(inv.minimum_threshold)
+                          return (
+                            <tr key={inv.id}>
+                              <td>#{inv.id}</td>
+                              <td><strong>{inv.item_name}</strong></td>
+                              <td>{stalls.find(s => s.id === inv.stall_id)?.name || 'Main Kitchen'}</td>
+                              <td>
+                                <strong style={{ color: isLow ? '#b91c1c' : '#15803d' }}>
+                                  {inv.current_stock} {inv.unit_of_measure}
+                                </strong>
+                              </td>
+                              <td>{inv.minimum_threshold} {inv.unit_of_measure}</td>
+                              <td>
+                                <span className={`status-pill ${isLow ? 'cancelled' : 'ready'}`}>
+                                  {isLow ? 'Low Stock' : 'Healthy'}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ADMIN TAB 5: USER DIRECTORY ("admin should be overview all the users") */}
+              {adminNavTab === 'users' && (
+                <div className="card-panel">
+                  <div className="card-panel-header" style={{ alignItems: 'center' }}>
+                    <div>
+                      <h3>All Registered Users ({userProfiles.length})</h3>
+                      <p>Full user management: create stall accounts, admin users, staff, and customer accounts</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        className="auth-btn-primary"
+                        onClick={() => {
+                          setAdminCreateUserModalOpen(true)
+                          setAdminUserModalError('')
+                          setAdminUserModalSuccess('')
+                        }}
+                        style={{ width: 'auto', padding: '0 16px', height: '36px', fontSize: '12px' }}
+                      >
+                        <Icon name="plus" size={15} /> Add User / Create Account
+                      </button>
+                      <div className="search-input-box" style={{ width: '180px', height: '36px' }}>
+                        <Icon name="search" size={15} />
+                        <input
+                          value={userSearchQuery}
+                          onChange={e => setUserSearchQuery(e.target.value)}
+                          placeholder="Search users..."
+                        />
+                      </div>
+                      <select
+                        value={userRoleFilter}
+                        onChange={e => setUserRoleFilter(e.target.value as any)}
+                        style={{
+                          border: '1px solid var(--line)',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <option value="all">All Roles</option>
+                        <option value="student">Customers / Students</option>
+                        <option value="staff">Kitchen Staff</option>
+                        <option value="stall_manager">Stall Accounts</option>
+                        <option value="admin">Administrators</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>User ID</th>
+                          <th>Full Name (First, Middle, Last)</th>
+                          <th>Role Tier</th>
+                          <th>Assigned Stall</th>
+                          <th>Grade / Dept</th>
+                          <th>Wallet Balance</th>
+                          <th>Status</th>
+                          <th>Admin Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {userProfiles
+                          .filter(u => {
+                            const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter
+                            const matchQuery =
+                              u.full_name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                              u.student_id.toLowerCase().includes(userSearchQuery.toLowerCase())
+                            return matchRole && matchQuery
+                          })
+                          .map(user => (
+                            <tr key={user.id}>
+                              <td><code>{user.student_id}</code></td>
+                              <td>
+                                <strong>{user.full_name}</strong>
+                                <small style={{ display: 'block', color: 'var(--muted)', fontSize: '11px' }}>
+                                  {user.first_name ? `${user.first_name} | ${user.middle_name || '—'} | ${user.last_name}` : 'Name record'}
+                                </small>
+                              </td>
+                              <td>
+                                <select
+                                  value={user.role}
+                                  onChange={async e => {
+                                    await canteenApi.auth.updateProfile(user.id, { role: e.target.value as UserRole })
+                                    refreshAllData()
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    border: '1px solid var(--line)',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    background:
+                                      user.role === 'admin'
+                                        ? '#ede9fe'
+                                        : user.role === 'stall_manager'
+                                        ? '#dbeafe'
+                                        : user.role === 'staff'
+                                        ? '#fef3c7'
+                                        : '#dcfce7',
+                                    color:
+                                      user.role === 'admin'
+                                        ? '#5b21b6'
+                                        : user.role === 'stall_manager'
+                                        ? '#1e40af'
+                                        : user.role === 'staff'
+                                        ? '#92400e'
+                                        : '#166534',
+                                  }}
+                                >
+                                  <option value="student">student</option>
+                                  <option value="staff">staff</option>
+                                  <option value="stall_manager">stall_manager</option>
+                                  <option value="admin">admin</option>
+                                </select>
+                              </td>
+                              <td>
+                                {(user.role === 'staff' || user.role === 'stall_manager') ? (
+                                  <select
+                                    value={user.stall_id || 1}
+                                    onChange={async e => {
+                                      await canteenApi.auth.updateProfile(user.id, { stall_id: Number(e.target.value) })
+                                      refreshAllData()
+                                    }}
+                                    style={{
+                                      padding: '3px 6px',
+                                      borderRadius: '6px',
+                                      border: '1px solid var(--line)',
+                                      fontSize: '11px',
+                                    }}
+                                    title="Assign Staff to Stall"
+                                  >
+                                    {stalls.map(s => (
+                                      <option key={s.id} value={s.id}>
+                                        {s.name} ({s.stall_code})
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span style={{ color: 'var(--muted)', fontSize: '11px' }}>Campus-wide</span>
+                                )}
+                              </td>
+                              <td>₱{user.balance}.00</td>
+                              <td>
+                                <span className={`status-pill ${user.is_active !== false ? 'ready' : 'cancelled'}`}>
+                                  {user.is_active !== false ? 'Active' : 'Suspended'}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <button
+                                    className="btn-secondary"
+                                    onClick={() => {
+                                      setAdminResetUser(user)
+                                      setAdminResetNewPwd('')
+                                    }}
+                                    style={{ padding: '3px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                    title="Reset Password for this User"
+                                  >
+                                    <Icon name="key" size={12} />
+                                    <span>Reset Pwd</span>
+                                  </button>
+                                  <button
+                                    className="btn-secondary"
+                                    onClick={async () => {
+                                      await canteenApi.auth.updateProfile(user.id, { is_active: !user.is_active })
+                                      refreshAllData()
+                                    }}
+                                    style={{ padding: '3px 8px', fontSize: '11px' }}
+                                  >
+                                    {user.is_active !== false ? 'Suspend' : 'Activate'}
+                                  </button>
+                                  <button
+                                    className="btn-secondary"
+                                    onClick={async () => {
+                                      if (window.confirm(`Are you sure you want to remove user "${user.full_name}"?`)) {
+                                        await canteenApi.auth.deleteProfile(user.id)
+                                        refreshAllData()
+                                      }
+                                    }}
+                                    style={{ padding: '3px 6px', fontSize: '11px', color: '#b91c1c' }}
+                                    title="Delete User"
+                                  >
+                                    <Icon name="trash" size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ADMIN TAB 6: SQL STUDIO */}
+              {adminNavTab === 'sql' && (
+                <SqlEditor
+                  onClose={() => {
+                    setAdminNavTab('overview')
+                    refreshAllData()
+                  }}
+                />
+              )}
+
+              {/* ADMIN TAB 7: TRIGGER AUDIT TRAIL */}
+              {adminNavTab === 'audit' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>PostgreSQL Trigger Audit Trail</h3>
+                      <p>Automated database logs captured by trg_audit_orders and security procedures</p>
+                    </div>
+                    <button className="btn-secondary" onClick={refreshAllData}>
+                      <Icon name="refresh" size={14} /> Refresh Logs
+                    </button>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Table</th>
+                          <th>Record Key</th>
+                          <th>Action</th>
+                          <th>Change Summary</th>
+                          <th>Timestamp</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditLogList.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
+                              No audit records captured yet.
+                            </td>
+                          </tr>
+                        ) : (
+                          auditLogList.map(log => (
+                            <tr key={log.id}>
+                              <td>#{log.id}</td>
+                              <td><code>{log.table_name}</code></td>
+                              <td>{log.record_id}</td>
+                              <td>
+                                <span className="status-pill ready">{log.action}</span>
+                              </td>
+                              <td>{log.change_summary || 'Trigger execution'}</td>
+                              <td>{new Date(log.created_at).toLocaleTimeString()}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ===============================================================
+              DASHBOARD 2: STAFF ROLE ("staff can crud the system, can edit anything")
+              =============================================================== */}
+          {currentUser.role === 'staff' && (
+            <>
+              <div className="dashboard-header">
+                <div className="dashboard-header-text">
+                  <span className="eyebrow-chip">
+                    <span className="sparkle">✳</span> KITCHEN STAFF OPERATIONS &amp; CRUD PANEL
+                  </span>
+                  <h1>Kitchen Display &amp; Canteen CRUD Authority</h1>
+                  <p>You have full authority to edit menu items, update prices, restock ingredients, and manage tickets.</p>
+                  
+                  {/* Stall handles many staff users */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-light)', padding: '8px 14px', borderRadius: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+                    <Icon name="store" size={16} />
+                    <strong style={{ color: 'var(--primary)', fontSize: '13px' }}>
+                      ASSIGNED STALL: {stalls.find(s => s.id === (currentUser.stall_id || 1))?.name || 'SmartBite Main Kitchen'} ({stalls.find(s => s.id === (currentUser.stall_id || 1))?.stall_code || 'STALL-01'})
+                    </strong>
+                    <span style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                      &bull; Staff Team on this Stall ({userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === (currentUser.stall_id || 1)).length} staff users):{' '}
+                      {userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === (currentUser.stall_id || 1)).map(u => u.full_name).join(', ')}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  className="auth-btn-primary"
+                  onClick={openCreateModal}
+                  style={{ width: 'auto', padding: '0 20px', height: '42px', fontSize: '13px' }}
+                >
+                  <Icon name="plus" size={16} /> Add Food Item
+                </button>
               </div>
-              <button
-                className="icon-button"
-                onClick={() => setCartOpen(false)}
-                aria-label="Close cart"
-              >
-                <Icon name="x" />
+
+              {/* Staff Navigation Tabs */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                <button
+                  className={`filter-pill-btn ${staffNavTab === 'kds' ? 'active' : ''}`}
+                  onClick={() => setStaffNavTab('kds')}
+                >
+                  Live KDS Queue ({allOrders.length})
+                </button>
+                <button
+                  className={`filter-pill-btn ${staffNavTab === 'menu_crud' ? 'active' : ''}`}
+                  onClick={() => setStaffNavTab('menu_crud')}
+                >
+                  Menu Items CRUD ({items.length})
+                </button>
+                <button
+                  className={`filter-pill-btn ${staffNavTab === 'inventory_crud' ? 'active' : ''}`}
+                  onClick={() => setStaffNavTab('inventory_crud')}
+                >
+                  Ingredient Stock CRUD ({inventoryList.length})
+                </button>
+              </div>
+
+              {/* STAFF TAB 1: LIVE KDS QUEUE */}
+              {staffNavTab === 'kds' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Live Kitchen KDS Queue</h3>
+                      <p>Orders awaiting cooking, prep, and counter pickup</p>
+                    </div>
+                    <button className="btn-secondary" onClick={refreshAllData}>
+                      <Icon name="refresh" size={14} /> Refresh Queue
+                    </button>
+                  </div>
+                  {allOrders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)' }}>
+                      No active tickets right now. All orders completed!
+                    </div>
+                  ) : (
+                    <div className="kds-cards-grid">
+                      {allOrders.map(ord => (
+                        <div className="kds-ticket-card" key={ord.id}>
+                          <div>
+                            <div className="kds-card-head">
+                              <div>
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--primary)' }}>
+                                  TICKET #{ord.id}
+                                </span>
+                                <strong style={{ display: 'block', fontSize: '15px', marginTop: '2px' }}>
+                                  {ord.student_name}
+                                </strong>
+                                <small style={{ color: 'var(--muted)' }}>ID: {ord.student_number}</small>
+                              </div>
+                              <span
+                                className={`status-pill ${
+                                  ord.order_status === 'Ready for pickup'
+                                    ? 'ready'
+                                    : ord.order_status === 'Preparing'
+                                    ? 'preparing'
+                                    : ord.order_status === 'Completed'
+                                    ? 'completed'
+                                    : 'pending'
+                                }`}
+                              >
+                                {ord.order_status}
+                              </span>
+                            </div>
+                            <ul className="kds-items-list">
+                              {ord.order_items?.map((oi, i) => (
+                                <li className="kds-item-row" key={i}>
+                                  <span>{oi.item_name} &times; {oi.quantity}</span>
+                                  <strong>₱{oi.item_subtotal}.00</strong>
+                                </li>
+                              )) || (
+                                <li className="kds-item-row">
+                                  <span>Meal Package</span>
+                                  <strong>₱{ord.total_amount}.00</strong>
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                          <div>
+                            {ord.order_status === 'Order placed' && (
+                              <button
+                                className="kds-btn-action"
+                                style={{ background: 'var(--accent-amber)' }}
+                                onClick={async () => {
+                                  await canteenApi.orders.updateStatus(ord.id, 'Preparing')
+                                  refreshAllData()
+                                }}
+                              >
+                                ▶ Start Cooking
+                              </button>
+                            )}
+                            {ord.order_status === 'Preparing' && (
+                              <button
+                                className="kds-btn-action"
+                                style={{ background: 'var(--primary)' }}
+                                onClick={async () => {
+                                  await canteenApi.orders.updateStatus(ord.id, 'Ready for pickup')
+                                  refreshAllData()
+                                }}
+                              >
+                                ✓ Mark Ready for Pickup
+                              </button>
+                            )}
+                            {ord.order_status === 'Ready for pickup' && (
+                              <button
+                                className="kds-btn-action"
+                                style={{ background: 'var(--muted)', color: '#fff' }}
+                                onClick={async () => {
+                                  await canteenApi.orders.updateStatus(ord.id, 'Completed')
+                                  refreshAllData()
+                                }}
+                              >
+                                ✓ Complete Ticket
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STAFF TAB 2: MENU CRUD */}
+              {staffNavTab === 'menu_crud' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Menu Catalog Manager (Add / Edit / Delete)</h3>
+                      <p>You can create new food items, adjust prices, and toggle availability</p>
+                    </div>
+                    <button className="btn-secondary" onClick={openCreateModal}>
+                      <Icon name="plus" size={14} /> Add New Dish
+                    </button>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Photo</th>
+                          <th>Dish Name</th>
+                          <th>Branch</th>
+                          <th>Category</th>
+                          <th>Price</th>
+                          <th>Prep Time</th>
+                          <th>Status</th>
+                          <th>CRUD Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map(item => (
+                          <tr key={item.id}>
+                            <td>
+                              <img
+                                src={item.image_url}
+                                alt=""
+                                style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }}
+                              />
+                            </td>
+                            <td><strong>{item.name}</strong></td>
+                            <td>{stalls.find(s => s.id === item.stall_id)?.name || `Branch #${item.stall_id}`}</td>
+                            <td>{item.category}</td>
+                            <td><strong style={{ color: 'var(--primary)' }}>₱{item.price}.00</strong></td>
+                            <td>{item.preparation_time_minutes} mins</td>
+                            <td>
+                              <span className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}>
+                                {item.is_available ? 'Available' : 'Sold Out'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  className="btn-secondary"
+                                  onClick={() => openEditModal(item)}
+                                  style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Icon name="edit" size={13} /> Edit
+                                </button>
+                                <button
+                                  className="btn-secondary"
+                                  onClick={() => handleDeleteMenuItem(item.id)}
+                                  style={{ padding: '4px 8px', fontSize: '11px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Icon name="trash" size={13} /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* STAFF TAB 3: INVENTORY STOCK CRUD */}
+              {staffNavTab === 'inventory_crud' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Ingredient Stock CRUD &amp; Thresholds</h3>
+                      <p>Monitor raw ingredient levels and trigger restock operations</p>
+                    </div>
+                    <button className="btn-secondary" onClick={refreshAllData}>
+                      <Icon name="refresh" size={14} /> Refresh Balances
+                    </button>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Ingredient</th>
+                          <th>Current Balance</th>
+                          <th>Safety Level</th>
+                          <th>Status</th>
+                          <th>Restock Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inventoryList.map(inv => {
+                          const isLow = Number(inv.current_stock) <= Number(inv.minimum_threshold)
+                          return (
+                            <tr key={inv.id}>
+                              <td>#{inv.id}</td>
+                              <td><strong>{inv.item_name}</strong></td>
+                              <td>
+                                <strong style={{ color: isLow ? '#b91c1c' : '#15803d', fontSize: '14px' }}>
+                                  {inv.current_stock} {inv.unit_of_measure}
+                                </strong>
+                              </td>
+                              <td>{inv.minimum_threshold} {inv.unit_of_measure}</td>
+                              <td>
+                                <span className={`status-pill ${isLow ? 'cancelled' : 'ready'}`}>
+                                  {isLow ? 'Low Stock' : 'Healthy'}
+                                </span>
+                              </td>
+                              <td>
+                                <button
+                                  className="btn-secondary"
+                                  style={{ padding: '4px 10px', fontSize: '11px' }}
+                                  onClick={async () => {
+                                    await canteenApi.inventory.restock(inv.id, 25)
+                                    refreshAllData()
+                                  }}
+                                >
+                                  + Restock (+25 {inv.unit_of_measure})
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ===============================================================
+              DASHBOARD 3: MINI STALL ROLE ("branches at least 2")
+              =============================================================== */}
+          {currentUser.role === 'stall_manager' && (
+            <>
+              <div className="dashboard-header">
+                <div className="dashboard-header-text">
+                  <span className="eyebrow-chip">
+                    <span className="sparkle">✳</span> MULTI-TENANT CANTEEN STALLS
+                  </span>
+                  <h1>Mini Stall Branches (2 Active Branches)</h1>
+                  <p>Independent vendor branches with isolated catalogs, daily sales, and operational switches.</p>
+                </div>
+                <button className="btn-secondary" onClick={refreshAllData}>
+                  <Icon name="refresh" size={14} /> Sync Branches
+                </button>
+              </div>
+
+              {/* 2 Branches Comparison Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+                {stalls.map(stall => {
+                  const stallItems = items.filter(i => i.stall_id === stall.id)
+                  const stallOrders = allOrders.filter(o => o.stall_id === stall.id)
+                  const stallRevenue = stallOrders
+                    .filter(o => o.order_status === 'Completed' || o.order_status === 'Ready for pickup')
+                    .reduce((sum, o) => sum + Number(o.total_amount), 0)
+
+                  return (
+                    <div className="card-panel" key={stall.id} style={{ margin: 0 }}>
+                      <div className="card-panel-header">
+                        <div>
+                          <span className="school-badge-mini" style={{ background: '#2563EB' }}>
+                            {stall.stall_code}
+                          </span>
+                          <h3 style={{ margin: '8px 0 2px' }}>{stall.name}</h3>
+                          <p>{stall.description}</p>
+                        </div>
+                        <button
+                          className={`status-pill ${stall.is_open ? 'ready' : 'cancelled'}`}
+                          style={{ cursor: 'pointer', border: 0 }}
+                          onClick={async () => {
+                            await canteenApi.stalls.updateStall(stall.id, { is_open: !stall.is_open })
+                            refreshAllData()
+                          }}
+                        >
+                          {stall.is_open ? '● OPEN' : '○ CLOSED'}
+                        </button>
+                      </div>
+
+                      {/* Stall Metrics */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gap: '10px',
+                          background: 'var(--bg-subtle)',
+                          padding: '12px',
+                          borderRadius: '10px',
+                          margin: '14px 0',
+                        }}
+                      >
+                        <div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>ITEMS</small>
+                          <strong style={{ fontSize: '15px' }}>{stallItems.length} dishes</strong>
+                        </div>
+                        <div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>ORDERS</small>
+                          <strong style={{ fontSize: '15px' }}>{stallOrders.length} tickets</strong>
+                        </div>
+                        <div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>SALES</small>
+                          <strong style={{ fontSize: '15px', color: 'var(--primary)' }}>₱{stallRevenue}.00</strong>
+                        </div>
+                      </div>
+
+                      {/* Offerings preview */}
+                      <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.5px' }}>
+                          OFFERINGS AT THIS BRANCH:
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                          {stallItems.map(si => (
+                            <div
+                              key={si.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#fff',
+                                border: '1px solid var(--line)',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                whiteSpace: 'nowrap',
+                                fontSize: '12px',
+                              }}
+                            >
+                              <img
+                                src={si.image_url}
+                                alt=""
+                                style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover' }}
+                              />
+                              <span>{si.name}</span>
+                              <strong style={{ color: 'var(--primary)' }}>₱{si.price}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Staff roster for this stall (stall handles many staff users) */}
+                      <div style={{ marginTop: '12px', borderTop: '1px dashed var(--line)', paddingTop: '10px', fontSize: '12px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
+                          STAFF TEAM ASSIGNED ({userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === stall.id).length} USERS):
+                        </span>
+                        <span style={{ color: 'var(--ink)' }}>
+                          {userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === stall.id).map(u => u.full_name).join(', ') || 'No staff assigned yet'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* ===============================================================
+              DASHBOARD 4: STUDENT ROLE (CATALOG, ACTIVE TICKET, HISTORY)
+              =============================================================== */}
+          {currentUser.role === 'student' && (
+            <>
+              {/* Header */}
+              <div className="dashboard-header">
+                <div className="dashboard-header-text">
+                  <span className="eyebrow-chip">
+                    <span className="sparkle">✳</span> STUDENT MEAL PORTAL
+                  </span>
+                  <h1>Good day, {currentUser.full_name}!</h1>
+                  <p>Browse campus stalls, order ahead, and skip the line.</p>
+                </div>
+                <div className="status-pill-open">
+                  <span>Balance:</span>
+                  <strong style={{ color: 'var(--primary)' }}>₱{currentUser.balance}.00</strong>
+                </div>
+              </div>
+
+              {/* Sub-nav Tabs */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
+                <button
+                  className={`filter-pill-btn ${studentNavTab === 'menu' ? 'active' : ''}`}
+                  onClick={() => setStudentNavTab('menu')}
+                >
+                  Food Menu Catalog
+                </button>
+                <button
+                  className={`filter-pill-btn ${studentNavTab === 'active_ticket' ? 'active' : ''}`}
+                  onClick={() => setStudentNavTab('active_ticket')}
+                >
+                  Live Active Ticket {activeOrder && '●'}
+                </button>
+                <button
+                  className={`filter-pill-btn ${studentNavTab === 'history' ? 'active' : ''}`}
+                  onClick={() => setStudentNavTab('history')}
+                >
+                  Order History
+                </button>
+              </div>
+
+              {/* TAB 1: FOOD CATALOG */}
+              {studentNavTab === 'menu' && (
+                <>
+                  {/* Live Ticket Reminder Card if order is placed */}
+                  {activeOrder && (
+                    <div className="live-ticket-card">
+                      <div
+                        style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '12px',
+                          background: 'rgba(255, 255, 255, 0.18)',
+                          display: 'grid',
+                          placeItems: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon name="receipt" size={24} />
+                      </div>
+                      <div style={{ minWidth: '220px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '1px' }}>
+                          ACTIVE TICKET #{activeOrder.id}
+                        </span>
+                        <strong style={{ display: 'block', fontSize: '15px', marginTop: '2px' }}>
+                          {activeOrder.order_status === 'Order placed'
+                            ? 'Order queued at kitchen'
+                            : activeOrder.order_status === 'Preparing'
+                            ? 'Chef is cooking your meal'
+                            : activeOrder.order_status === 'Ready for pickup'
+                            ? 'Ready for pickup at counter!'
+                            : 'Completed'}
+                        </strong>
+                        <small style={{ opacity: 0.85 }}>Estimated pickup in {activeOrder.pickup_time || '8–12 mins'}</small>
+                      </div>
+                      <div className="ticket-step-track">
+                        {['Order placed', 'Preparing', 'Ready for pickup'].map((step, idx) => {
+                          const isDone =
+                            activeOrder.order_status === 'Ready for pickup' ||
+                            activeOrder.order_status === 'Completed' ||
+                            (activeOrder.order_status === 'Preparing' && idx <= 1) ||
+                            idx === 0
+                          return (
+                            <div className={`ticket-step-node ${isDone ? 'done' : ''}`} key={step}>
+                              <div className="ticket-node-icon">
+                                {isDone ? <Icon name="check" size={13} /> : idx + 1}
+                              </div>
+                              <span>{step}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <button
+                        className="btn-secondary"
+                        onClick={() => setStudentNavTab('active_ticket')}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Track Ticket &rarr;
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Search and Branch Filter Toolbar */}
+                  <div className="catalog-toolbar">
+                    <div className="search-input-box">
+                      <Icon name="search" size={16} />
+                      <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Search canteen dishes..."
+                      />
+                    </div>
+
+                    {/* Branch Switcher */}
+                    <div className="filter-pills-row">
+                      <button
+                        className={`filter-pill-btn ${selectedStallFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setSelectedStallFilter('all')}
+                      >
+                        All Branches
+                      </button>
+                      {stalls.map(s => (
+                        <button
+                          key={s.id}
+                          className={`filter-pill-btn ${selectedStallFilter === s.id ? 'active' : ''}`}
+                          onClick={() => setSelectedStallFilter(s.id)}
+                        >
+                          {s.name} ({s.stall_code})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Categories Pills */}
+                  <div className="filter-pills-row" style={{ marginBottom: '16px' }}>
+                    {categories.map(cat => (
+                      <button
+                        key={cat}
+                        className={`filter-pill-btn ${category === cat ? 'active' : ''}`}
+                        onClick={() => setCategory(cat)}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Dish Cards Grid */}
+                  <div className="food-cards-grid">
+                    {filteredItems.map(item => {
+                      const qty = cart[item.id] || 0
+                      return (
+                        <div className="dish-card" key={item.id}>
+                          <div className="dish-img-wrap">
+                            <img src={item.image_url} alt={item.name} />
+                            <span className="dish-stall-tag">
+                              {stalls.find(s => s.id === item.stall_id)?.name || 'Canteen'}
+                            </span>
+                          </div>
+                          <div className="dish-card-body">
+                            <span className="dish-category">
+                              {item.category} &bull; {item.preparation_time_minutes} min
+                            </span>
+                            <h4>{item.name}</h4>
+                            <p>{item.description}</p>
+                            <div className="dish-card-footer">
+                              <span className="dish-price">₱{item.price}.00</span>
+                              {qty > 0 ? (
+                                <div className="qty-stepper">
+                                  <button onClick={() => changeQty(item.id, -1)}>
+                                    <Icon name="minus" size={14} />
+                                  </button>
+                                  <span>{qty}</span>
+                                  <button onClick={() => changeQty(item.id, 1)}>
+                                    <Icon name="plus" size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button className="add-cart-btn" onClick={() => changeQty(item.id, 1)}>
+                                  <Icon name="plus" size={15} /> Add
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* TAB 2: ACTIVE TICKET TRACKER */}
+              {studentNavTab === 'active_ticket' && (
+                <div className="card-panel" style={{ maxWidth: '640px' }}>
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Live Ticket Tracker</h3>
+                      <p>Track food prep and counter dispatch in real-time</p>
+                    </div>
+                    {activeOrder && (
+                      <span className="status-pill ready">{activeOrder.order_status}</span>
+                    )}
+                  </div>
+                  {activeOrder ? (
+                    <div>
+                      <div style={{ marginBottom: '20px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 800 }}>
+                          TICKET #{activeOrder.id}
+                        </span>
+                        <h2 style={{ fontFamily: 'var(--font-serif)', margin: '4px 0 8px' }}>
+                          {activeOrder.order_status === 'Ready for pickup'
+                            ? 'Your meal is READY for pickup at counter!'
+                            : activeOrder.order_status === 'Preparing'
+                            ? 'Kitchen is preparing your order...'
+                            : 'Order placed with canteen'}
+                        </h2>
+                        <p style={{ color: 'var(--muted)', margin: 0 }}>
+                          Estimated ready time: {activeOrder.pickup_time || '8–12 minutes'}
+                        </p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--muted)' }}>Student Name</span>
+                          <strong>{activeOrder.student_name}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--muted)' }}>Student ID</span>
+                          <strong>{activeOrder.student_number}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--muted)' }}>Payment Method</span>
+                          <strong>{activeOrder.payment_method}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--line)', paddingTop: '12px', fontSize: '16px' }}>
+                          <strong>Total</strong>
+                          <strong style={{ color: 'var(--primary)' }}>₱{activeOrder.total_amount}.00</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted)' }}>
+                      <p>You have no active orders queued right now.</p>
+                      <button className="auth-btn-primary" onClick={() => setStudentNavTab('menu')} style={{ maxWidth: '200px', margin: '14px auto 0' }}>
+                        Go to Menu
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: ORDER HISTORY */}
+              {studentNavTab === 'history' && (
+                <div className="card-panel">
+                  <div className="card-panel-header">
+                    <div>
+                      <h3>Your Order History</h3>
+                      <p>Past campus canteen purchases</p>
+                    </div>
+                  </div>
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Ticket ID</th>
+                          <th>Items</th>
+                          <th>Branch</th>
+                          <th>Total Amount</th>
+                          <th>Status</th>
+                          <th>Payment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allOrders.filter(o => o.student_number === currentUser.student_id).length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--muted)' }}>
+                              No previous orders recorded for this account.
+                            </td>
+                          </tr>
+                        ) : (
+                          allOrders
+                            .filter(o => o.student_number === currentUser.student_id)
+                            .map(ord => (
+                              <tr key={ord.id}>
+                                <td><code>#{ord.id}</code></td>
+                                <td>
+                                  {ord.order_items?.map(i => `${i.item_name} (x${i.quantity})`).join(', ') || 'Package'}
+                                </td>
+                                <td>{stalls.find(s => s.id === ord.stall_id)?.name || 'Main Canteen'}</td>
+                                <td><strong>₱{ord.total_amount}.00</strong></td>
+                                <td>
+                                  <span className="status-pill completed">{ord.order_status}</span>
+                                </td>
+                                <td>{ord.payment_method}</td>
+                              </tr>
+                            ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* =====================================================================
+          STUDENT CART SLIDE-OVER DRAWER
+          ===================================================================== */}
+      {cartOpen && (
+        <div className="cart-overlay" onMouseDown={() => setCartOpen(false)}>
+          <aside className="cart-slide-drawer" onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '18px', borderBottom: '1px solid var(--line)' }}>
+              <div>
+                <span className="eyebrow-chip" style={{ margin: 0 }}>YOUR TICKET</span>
+                <h3 style={{ margin: '4px 0 0', fontFamily: 'var(--font-serif)', fontSize: '22px' }}>
+                  {placed ? 'Order Confirmed' : 'My Cart'}
+                </h3>
+              </div>
+              <button className="icon-action-btn" onClick={() => setCartOpen(false)}>
+                <Icon name="x" size={18} />
               </button>
             </div>
+
             {placed ? (
-              <div className="success">
-                <span>
-                  <Icon name="check" size={30} />
-                </span>
-                <h3>Thanks, Rommel!</h3>
-                <p>
-                  Your order <strong>{activeOrder.id}</strong> was sent directly to Supabase and
-                  the canteen. We'll let you know when it's ready.
+              <div style={{ textAlign: 'center', margin: 'auto 0' }}>
+                <div
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'var(--primary-light)',
+                    color: 'var(--primary)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    margin: '0 auto 16px',
+                  }}
+                >
+                  <Icon name="check" size={32} />
+                </div>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '24px', margin: '0 0 8px' }}>
+                  Order Placed!
+                </h3>
+                <p style={{ color: 'var(--muted)', fontSize: '13px', lineHeight: 1.5 }}>
+                  Your ticket <strong>#{activeOrder?.id}</strong> was sent to the kitchen.
                 </p>
                 <button
+                  className="auth-btn-primary"
                   onClick={() => {
                     setPlaced(false)
                     setCart({})
                     setCartOpen(false)
+                    setStudentNavTab('active_ticket')
                   }}
+                  style={{ marginTop: '24px' }}
                 >
-                  Back to menu
+                  Track Active Ticket
                 </button>
               </div>
             ) : (
               <>
-                <div className="cart-list">
-                  {items
-                    .filter(item => (cart[item.id] || 0) > 0)
-                    .map(item => (
-                      <div className="cart-item" key={item.id}>
-                        <img src={item.image} alt="" />
-                        <div>
-                          <strong>{item.name}</strong>
-                          <span>₱{item.price}.00</span>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0' }}>
+                  {count === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px 10px', color: 'var(--muted)' }}>
+                      Your cart is currently empty.
+                    </div>
+                  ) : (
+                    items
+                      .filter(i => cart[i.id])
+                      .map(item => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px 0',
+                            borderBottom: '1px solid var(--line)',
+                          }}
+                        >
+                          <img
+                            src={item.image_url}
+                            alt=""
+                            style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <strong style={{ display: 'block', fontSize: '13px' }}>{item.name}</strong>
+                            <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '13px' }}>
+                              ₱{item.price}.00
+                            </span>
+                          </div>
+                          <div className="qty-stepper">
+                            <button onClick={() => changeQty(item.id, -1)}>
+                              <Icon name="minus" size={13} />
+                            </button>
+                            <span>{cart[item.id]}</span>
+                            <button onClick={() => changeQty(item.id, 1)}>
+                              <Icon name="plus" size={13} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="quantity">
-                          <button onClick={() => changeQty(item.id, -1)}>
-                            <Icon name="minus" size={14} />
-                          </button>
-                          <span>{cart[item.id]}</span>
-                          <button onClick={() => changeQty(item.id, 1)}>
-                            <Icon name="plus" size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                  )}
                 </div>
-                <div className="cart-summary">
-                  <div>
+
+                <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: 'var(--muted)' }}>
                     <span>Subtotal</span>
-                    <strong>₱{subtotal}.00</strong>
+                    <strong style={{ color: 'var(--ink)' }}>₱{subtotal}.00</strong>
                   </div>
-                  <div>
-                    <span>Service fee</span>
-                    <strong>₱0.00</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '13px', color: 'var(--muted)' }}>
+                    <span>Campus Service Fee</span>
+                    <strong style={{ color: 'var(--ink)' }}>₱0.00</strong>
                   </div>
-                  <div className="total">
-                    <span>Total</span>
-                    <strong>₱{subtotal}.00</strong>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      borderTop: '1px dashed var(--line)',
+                      paddingTop: '12px',
+                      fontSize: '17px',
+                    }}
+                  >
+                    <strong>Total Amount</strong>
+                    <strong style={{ color: 'var(--primary)' }}>₱{subtotal}.00</strong>
                   </div>
-                  <button disabled={!count || isSubmitting} onClick={handlePlaceOrder}>
-                    {isSubmitting ? 'Placing order...' : 'Place order'} <Icon name="arrow" size={18} />
+
+                  <button
+                    className="auth-btn-primary"
+                    disabled={!count || isSubmitting}
+                    onClick={handlePlaceOrder}
+                    style={{ marginTop: '18px' }}
+                  >
+                    {isSubmitting ? 'Transacting...' : 'Place Order & Pay at Counter'} <span>&rarr;</span>
                   </button>
-                  <small>Pay at the canteen counter upon pickup.</small>
+                  <small
+                    style={{
+                      display: 'block',
+                      textAlign: 'center',
+                      color: 'var(--muted)',
+                      fontSize: '11px',
+                      marginTop: '10px',
+                    }}
+                  >
+                    Order as: {currentUser.full_name} ({currentUser.student_id})
+                  </small>
                 </div>
               </>
             )}
           </aside>
+        </div>
+      )}
+
+      {/* =====================================================================
+          STAFF CRUD MODAL (ADD / EDIT FOOD DISH)
+          ===================================================================== */}
+      {itemModalOpen && (
+        <div className="crud-modal-overlay" onMouseDown={() => setItemModalOpen(false)}>
+          <div className="crud-modal" onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <h3>{editingItem ? 'Edit Food Item' : 'Add New Food Item'}</h3>
+              <button
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setItemModalOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveMenuItem}>
+              <div className="crud-modal-body">
+                <div className="crud-form-group">
+                  <label>Item Name</label>
+                  <input
+                    value={itemFormName}
+                    onChange={e => setItemFormName(e.target.value)}
+                    placeholder="e.g. Pork Tonkatsu Bowl"
+                    required
+                  />
+                </div>
+                <div className="crud-form-group">
+                  <label>Description</label>
+                  <textarea
+                    rows={2}
+                    value={itemFormDesc}
+                    onChange={e => setItemFormDesc(e.target.value)}
+                    placeholder="Crispy breaded pork with special savory sauce"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="crud-form-group">
+                    <label>Price (PHP)</label>
+                    <input
+                      type="number"
+                      value={itemFormPrice}
+                      onChange={e => setItemFormPrice(Number(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="crud-form-group">
+                    <label>Prep Time (Minutes)</label>
+                    <input
+                      type="number"
+                      value={itemFormPrepTime}
+                      onChange={e => setItemFormPrepTime(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="crud-form-group">
+                    <label>Category</label>
+                    <select
+                      value={itemFormCategory}
+                      onChange={e => setItemFormCategory(e.target.value)}
+                    >
+                      <option value="Rice Meals">Rice Meals</option>
+                      <option value="Breakfast">Breakfast</option>
+                      <option value="Snacks">Snacks</option>
+                      <option value="Drinks">Drinks</option>
+                    </select>
+                  </div>
+                  <div className="crud-form-group">
+                    <label>Canteen Branch</label>
+                    <select
+                      value={itemFormStallId}
+                      onChange={e => setItemFormStallId(Number(e.target.value))}
+                    >
+                      {stalls.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.stall_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="crud-form-group">
+                  <label>Photo URL</label>
+                  <input
+                    value={itemFormImage}
+                    onChange={e => setItemFormImage(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    id="avail_chk"
+                    checked={itemFormAvailable}
+                    onChange={e => setItemFormAvailable(e.target.checked)}
+                  />
+                  <label htmlFor="avail_chk" style={{ fontSize: '13px', fontWeight: 700 }}>
+                    Item is Available
+                  </label>
+                </div>
+              </div>
+              <div className="crud-modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setItemModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button className="auth-btn-primary" type="submit" style={{ width: 'auto', padding: '0 20px', height: '40px', fontSize: '13px' }}>
+                  {editingItem ? 'Save Updates' : 'Add Dish'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL 1: CHANGE PASSWORD MODAL (Available to EVERY account)
+          =============================================================== */}
+      {changePasswordModalOpen && (
+        <div className="crud-modal-overlay" onMouseDown={() => setChangePasswordModalOpen(false)}>
+          <div className="crud-modal" style={{ maxWidth: '440px', width: 'min(440px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ color: 'var(--primary)' }}>
+                  <Icon name="key" size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontFamily: 'var(--font-serif)' }}>Security & Password</h3>
+                  <small style={{ color: 'var(--muted)' }}>Update account password for {currentUser.full_name}</small>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setChangePasswordModalOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword}>
+              <div className="crud-modal-body">
+                {pwdError && <div className="toast-error">{pwdError}</div>}
+                {pwdSuccess && <div className="toast-success">{pwdSuccess}</div>}
+
+                <div className="crud-form-group">
+                  <label>Current Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter current password"
+                    value={currentPwd}
+                    onChange={e => setCurrentPwd(e.target.value)}
+                    required
+                  />
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                    Default demo password is <code>admin123</code>, <code>staff123</code>, <code>stall123</code>, or <code>student123</code>.
+                  </small>
+                </div>
+
+                <div className="crud-form-group">
+                  <label>New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter new secure password"
+                    value={newPwd}
+                    onChange={e => setNewPwd(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="crud-form-group">
+                  <label>Confirm New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPwd}
+                    onChange={e => setConfirmPwd(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="crud-modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setChangePasswordModalOpen(false)
+                    setPwdError('')
+                    setPwdSuccess('')
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="auth-btn-primary"
+                  type="submit"
+                  style={{ width: 'auto', padding: '0 22px', height: '40px', fontSize: '13px' }}
+                >
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL 2: ADMIN USER & STALL CREATION MODAL
+          =============================================================== */}
+      {adminCreateUserModalOpen && (
+        <div className="crud-modal-overlay" onMouseDown={() => setAdminCreateUserModalOpen(false)}>
+          <div className="crud-modal" style={{ maxWidth: '620px', width: 'min(620px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div>
+                <span className="sidebar-section-kicker" style={{ margin: 0, color: 'var(--primary)', paddingLeft: 0 }}>ADMINISTRATION PORTAL</span>
+                <h3 style={{ margin: '2px 0 0', fontSize: '20px', fontFamily: 'var(--font-serif)' }}>
+                  Create New Account or Stall Branch
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setAdminCreateUserModalOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminCreateUser}>
+              <div className="crud-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                {adminUserModalError && <div className="toast-error">{adminUserModalError}</div>}
+                {adminUserModalSuccess && <div className="toast-success">{adminUserModalSuccess}</div>}
+
+                {/* Role Selector Tabs */}
+                <div className="crud-form-group">
+                  <label>Select Account Role</label>
+                  <div className="modal-role-selector">
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${newRole === 'stall_manager' ? 'active' : ''}`}
+                      onClick={() => setNewRole('stall_manager')}
+                    >
+                      Stall Account
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${newRole === 'admin' ? 'active' : ''}`}
+                      onClick={() => setNewRole('admin')}
+                    >
+                      Admin User
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${newRole === 'staff' ? 'active' : ''}`}
+                      onClick={() => setNewRole('staff')}
+                    >
+                      Staff Member
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${newRole === 'student' ? 'active' : ''}`}
+                      onClick={() => setNewRole('student')}
+                    >
+                      Customer (Student)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Name Breakdown: First Name, Middle Name, Last Name */}
+                <div className="crud-form-group">
+                  <label>Full Legal Name</label>
+                  <div className="name-inputs-row">
+                    <div>
+                      <input
+                        placeholder="First Name *"
+                        value={newFirstName}
+                        onChange={e => setNewFirstName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <input
+                        placeholder="Middle Name"
+                        value={newMiddleName}
+                        onChange={e => setNewMiddleName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        placeholder="Last Name *"
+                        value={newLastName}
+                        onChange={e => setNewLastName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="crud-form-group">
+                    <label>
+                      {newRole === 'student'
+                        ? 'Student ID Number'
+                        : newRole === 'staff'
+                        ? 'Staff Employee ID'
+                        : newRole === 'stall_manager'
+                        ? 'Stall Manager ID'
+                        : 'Admin ID'}
+                    </label>
+                    <input
+                      placeholder={newRole === 'student' ? 'e.g. 2025-09876' : 'e.g. EMP-2025-01'}
+                      value={newUserId}
+                      onChange={e => setNewUserId(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="crud-form-group">
+                    <label>Department / Grade</label>
+                    <input
+                      placeholder="e.g. Canteen Operations / Grade 11"
+                      value={newDept}
+                      onChange={e => setNewDept(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="crud-form-group">
+                    <label>Initial Password</label>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="crud-form-group">
+                    <label>Initial Balance (₱)</label>
+                    <input
+                      type="number"
+                      value={newBalance}
+                      onChange={e => setNewBalance(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+
+                {/* STALL ASSIGNMENT (Staff belongs to a stall; 1 stall handles many staff users) */}
+                {newRole === 'staff' && (
+                  <div className="crud-form-group" style={{ background: 'var(--bg-subtle)', padding: '12px', borderRadius: '8px' }}>
+                    <label style={{ color: 'var(--primary)', fontWeight: 800 }}>
+                      Assigned Canteen Stall (1 Stall handles many staff)
+                    </label>
+                    <select
+                      value={newStallId}
+                      onChange={e => setNewStallId(Number(e.target.value))}
+                      style={{ marginTop: '6px' }}
+                    >
+                      {stalls.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.stall_code}) &bull; {userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === s.id).length} current staff
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                      This staff member will prepare and process orders for this stall branch.
+                    </small>
+                  </div>
+                )}
+
+                {/* STALL ACCOUNT SPECIFIC: ASSIGN TO EXISTING OR CREATE NEW STALL BRANCH */}
+                {newRole === 'stall_manager' && (
+                  <div style={{ background: 'var(--bg-subtle)', padding: '14px', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                      <input
+                        type="checkbox"
+                        id="newStallChk"
+                        checked={createNewStallCheckbox}
+                        onChange={e => setCreateNewStallCheckbox(e.target.checked)}
+                      />
+                      <label htmlFor="newStallChk" style={{ fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                        Register a Brand New Canteen Stall Branch in System
+                      </label>
+                    </div>
+
+                    {!createNewStallCheckbox ? (
+                      <div className="crud-form-group" style={{ margin: 0 }}>
+                        <label>Manage Existing Stall Branch</label>
+                        <select
+                          value={newStallId}
+                          onChange={e => setNewStallId(Number(e.target.value))}
+                        >
+                          {stalls.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.stall_code})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+                          <div className="crud-form-group" style={{ margin: 0 }}>
+                            <label>Branch / Stall Name *</label>
+                            <input
+                              placeholder="e.g. Station C &ndash; Beverage Hub"
+                              value={newStallName}
+                              onChange={e => setNewStallName(e.target.value)}
+                              required={createNewStallCheckbox}
+                            />
+                          </div>
+                          <div className="crud-form-group" style={{ margin: 0 }}>
+                            <label>Stall Code</label>
+                            <input
+                              placeholder="e.g. STALL-03"
+                              value={newStallCode}
+                              onChange={e => setNewStallCode(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="crud-form-group" style={{ margin: 0 }}>
+                          <label>Stall Description</label>
+                          <input
+                            placeholder="e.g. Fresh fruit juices, milk teas, and hot espresso"
+                            value={newStallDesc}
+                            onChange={e => setNewStallDesc(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="crud-modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setAdminCreateUserModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="auth-btn-primary"
+                  type="submit"
+                  style={{ width: 'auto', padding: '0 24px', height: '40px', fontSize: '13px' }}
+                >
+                  Create {newRole === 'stall_manager' ? 'Stall Account' : newRole === 'admin' ? 'Admin User' : newRole === 'staff' ? 'Staff Member' : 'Customer Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL 3: ADMIN RESET USER PASSWORD MODAL
+          =============================================================== */}
+      {adminResetUser && (
+        <div className="crud-modal-overlay" onMouseDown={() => setAdminResetUser(null)}>
+          <div className="crud-modal" style={{ maxWidth: '420px', width: 'min(420px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div>
+                <span className="sidebar-section-kicker" style={{ margin: 0, color: 'var(--primary)', paddingLeft: 0 }}>USER SECURITY OVERRIDE</span>
+                <h3 style={{ margin: '2px 0 0', fontSize: '18px', fontFamily: 'var(--font-serif)' }}>
+                  Reset User Password
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setAdminResetUser(null)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminResetPassword}>
+              <div className="crud-modal-body">
+                <div style={{ background: 'var(--bg-subtle)', padding: '12px', borderRadius: '8px', marginBottom: '14px', fontSize: '13px' }}>
+                  <div><strong>Account:</strong> {adminResetUser.full_name}</div>
+                  <div><strong>User ID:</strong> {adminResetUser.student_id}</div>
+                  <div><strong>Role:</strong> <span style={{ textTransform: 'capitalize' }}>{adminResetUser.role}</span></div>
+                </div>
+
+                <div className="crud-form-group">
+                  <label>Enter New Password for User</label>
+                  <input
+                    type="password"
+                    placeholder="e.g. newpassword123"
+                    value={adminResetNewPwd}
+                    onChange={e => setAdminResetNewPwd(e.target.value)}
+                    required
+                  />
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                    The user will use this new password immediately upon their next log in.
+                  </small>
+                </div>
+              </div>
+
+              <div className="crud-modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setAdminResetUser(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="auth-btn-primary"
+                  type="submit"
+                  style={{ width: 'auto', padding: '0 20px', height: '40px', fontSize: '13px' }}
+                >
+                  Save New Password
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
