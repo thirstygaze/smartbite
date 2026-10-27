@@ -317,6 +317,10 @@ export default function App() {
   const [regFirstName, setRegFirstName] = useState('')
   const [regMiddleName, setRegMiddleName] = useState('')
   const [regLastName, setRegLastName] = useState('')
+  const [regStudentId, setRegStudentId] = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [showRegPassword, setShowRegPassword] = useState(false)
   const [regDept, setRegDept] = useState('Grade 12 - STEM')
 
   // Change Password Modal (Available for EVERY account)
@@ -716,16 +720,31 @@ export default function App() {
     const lnErr = validateName(regLastName, 'Last Name')
     if (lnErr) { setAuthError(lnErr); return }
 
+    const idErr = validateIdNumber(regStudentId, undefined, userProfiles)
+    if (idErr) { setAuthError(idErr); return }
+
+    const normalizedEmail = regEmail.trim().toLowerCase()
+    if (userProfiles.some(profile => profile.email?.toLowerCase() === normalizedEmail)) {
+      setAuthError('That email address is already registered.')
+      return
+    }
+
+    const pwdErr = validatePassword(regPassword)
+    if (pwdErr) { setAuthError(pwdErr); return }
+
     const fullName = `${regFirstName.trim()} ${regMiddleName.trim() ? regMiddleName.trim() + ' ' : ''}${regLastName.trim()}`.trim()
 
     try {
       await canteenApi.auth.createProfile({
+        student_id: regStudentId.trim(),
+        email: normalizedEmail,
         first_name: regFirstName.trim(),
         middle_name: regMiddleName.trim(),
         last_name: regLastName.trim(),
         full_name: fullName,
         grade_or_dept: regDept.trim(),
         role: 'student',
+        password: regPassword,
         balance: 500.0,
       })
     } catch (err) {
@@ -736,12 +755,15 @@ export default function App() {
     setRegFirstName('')
     setRegMiddleName('')
     setRegLastName('')
+    setRegStudentId('')
+    setRegEmail('')
+    setRegPassword('')
     setRegDept('Grade 12 - STEM')
     setAuthStep('signin')
-    setStudentId('')
+    setStudentId(regStudentId.trim())
     setPassword('')
     setAuthError('')
-    setAuthNotice('Account created. An administrator must assign your email, user ID, and password before you can sign in.')
+    setAuthNotice('Account created. Sign in with your email or user ID and the password you chose.')
     refreshAllData()
   }
 
@@ -1491,7 +1513,7 @@ export default function App() {
               <span className="sparkle">✳</span> NEW STUDENT REGISTRATION
             </span>
             <h1>Create an account.</h1>
-            <p>Join Smartbite to order lunch ahead and skip the campus line. An administrator will assign your email, user ID, and password.</p>
+            <p>Join Smartbite to order lunch ahead and skip the campus line.</p>
           </div>
 
           <form onSubmit={handleSignUp}>
@@ -1528,6 +1550,36 @@ export default function App() {
             </div>
 
             <div className="auth-field">
+              <span className="auth-field-label">Student ID Number</span>
+              <div className="auth-input-box" style={{ marginTop: '7px' }}>
+                <input
+                  value={regStudentId}
+                  onChange={e => setRegStudentId(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter your student ID"
+                  maxLength={12}
+                  required
+                />
+              </div>
+              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                Numbers only, at least 4 digits, and must be unique.
+              </small>
+            </div>
+
+            <div className="auth-field">
+              <span className="auth-field-label">School Email</span>
+              <div className="auth-input-box" style={{ marginTop: '7px' }}>
+                <input
+                  type="email"
+                  value={regEmail}
+                  onChange={e => setRegEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="auth-field">
               <span className="auth-field-label">Grade Level / Department</span>
               <div className="auth-input-box" style={{ marginTop: '7px' }}>
                 <input
@@ -1539,9 +1591,29 @@ export default function App() {
               </div>
             </div>
 
-            <div className="auth-callout-notice" role="note">
-              <span className="notice-icon">✳</span>
-              <span>After creating your account, contact a canteen administrator to assign your email, user ID, and password.</span>
+            <div className="auth-field">
+              <span className="auth-field-label">Password</span>
+              <div className="auth-input-box" style={{ marginTop: '7px' }}>
+                <input
+                  type={showRegPassword ? 'text' : 'password'}
+                  value={regPassword}
+                  onChange={e => setRegPassword(e.target.value.replace(/\s/g, ''))}
+                  placeholder="Create a password (min 6 characters)"
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-toggle-pwd"
+                  onClick={() => setShowRegPassword(!showRegPassword)}
+                  aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Icon name={showRegPassword ? 'eye-off' : 'eye'} size={17} />
+                </button>
+              </div>
+              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                Use at least 6 characters with letters and numbers. No spaces.
+              </small>
             </div>
 
             {authError && <div className="auth-error-pill">{authError}</div>}
