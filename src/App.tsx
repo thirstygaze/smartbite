@@ -7,9 +7,10 @@ import {
   InventoryItem,
   AuditLog,
   UserRole,
+  MENU_RECIPES,
+  deductInventoryStock,
 } from './supabase'
 import { canteenApi } from './services/canteenApi'
-import SqlEditor from './components/SqlEditor'
 
 type IconName =
   | 'home'
@@ -210,9 +211,100 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   )
 }
 
+interface NotificationItem {
+  id: string
+  title: string
+  message: string
+  time: string
+  type: 'order' | 'balance' | 'announcement'
+  unread: boolean
+}
+
+// =========================================================================
+// VALIDATION HELPERS (Letters-only names, numeric unique IDs, secure passwords)
+// =========================================================================
+function validateName(name: string, fieldName: string): string | null {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    return `${fieldName} is required.`
+  }
+  if (!/^[A-Za-z\s]+$/.test(trimmed)) {
+    return `${fieldName} must contain only letters (no numbers or special characters).`
+  }
+  return null
+}
+
+function validateOptionalMiddleName(name: string): string | null {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  if (!/^[A-Za-z\s]+$/.test(trimmed)) {
+    return 'Middle Name must contain only letters (no numbers or special characters).'
+  }
+  return null
+}
+
+function validateIdNumber(
+  id: string,
+  excludeProfileId?: string,
+  profiles: Profile[] = []
+): string | null {
+  const trimmed = id.trim()
+  if (!trimmed) {
+    return 'ID Number is required.'
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    return 'ID Number must contain only numbers (digits 0-9, no letters or symbols).'
+  }
+  if (trimmed.length < 4) {
+    return 'ID Number must be at least 4 digits.'
+  }
+  // Cannot be all the same repeating digit (e.g., 11111, 00000, 99999)
+  if (/^(\d)\1+$/.test(trimmed)) {
+    return 'ID Number cannot be all the same repeating digit (e.g. 11111). Please use a valid number.'
+  }
+  // Cannot be already assigned to another account
+  const duplicate = profiles.find(
+    p => (!excludeProfileId || p.id !== excludeProfileId) && p.student_id === trimmed
+  )
+  if (duplicate) {
+    return `ID Number "${trimmed}" is already assigned to ${duplicate.full_name}. Please use a unique ID.`
+  }
+  return null
+}
+
+function validatePassword(pwd: string): string | null {
+  if (!pwd) {
+    return 'Password is required.'
+  }
+  if (/\s/.test(pwd)) {
+    return 'Password cannot contain spaces.'
+  }
+  if (pwd.length < 6) {
+    return 'Password must be at least 6 characters long.'
+  }
+  if (/^(.)\1+$/.test(pwd)) {
+    return 'Password cannot consist of all the same character (e.g. 111111 or aaaaaa).'
+  }
+  const hasLetter = /[A-Za-z]/.test(pwd)
+  const hasNumber = /[0-9]/.test(pwd)
+  if (!hasLetter || !hasNumber) {
+    return 'Password must contain a mix of both letters and numbers (cannot be all numbers or all letters).'
+  }
+  return null
+}
+
 export default function App() {
-  // Authentication Step & Flow
-  const [loggedIn, setLoggedIn] = useState(false)
+  // Authentication Step & Flow (Persisted in localStorage so refreshing never logs out)
+  const [loggedIn, setLoggedIn] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('smartbite_session_user')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && parsed.student_id) return true
+      }
+    } catch {}
+    return false
+  })
   const [authStep, setAuthStep] = useState<'welcome' | 'signin' | 'signup'>('welcome')
   const [chosenRole, setChosenRole] = useState<UserRole>('student')
   const [studentId, setStudentId] = useState('2025-01234')
@@ -258,21 +350,181 @@ export default function App() {
   const [adminResetUser, setAdminResetUser] = useState<Profile | null>(null)
   const [adminResetNewPwd, setAdminResetNewPwd] = useState('')
 
-  // Logged-in Profile
-  const [currentUser, setCurrentUser] = useState<Profile>({
-    id: 'p-1',
-    student_id: '2025-01234',
-    full_name: 'Rommel Custodio',
-    grade_or_dept: 'Grade 12 - STEM',
-    role: 'student',
-    balance: 500.0,
+  // Admin Edit User Modal (Change Name, First/Middle/Last, ID Number, Role, Dept, Balance, Stall)
+  const [adminEditUser, setAdminEditUser] = useState<Profile | null>(null)
+  const [editFirstName, setEditFirstName] = useState('')
+  const [editMiddleName, setEditMiddleName] = useState('')
+  const [editLastName, setEditLastName] = useState('')
+  const [editStudentId, setEditStudentId] = useState('')
+  const [editRole, setEditRole] = useState<UserRole>('student')
+  const [editDept, setEditDept] = useState('')
+  const [editBalance, setEditBalance] = useState<number>(0)
+  const [editStallId, setEditStallId] = useState<number>(1)
+  const [editError, setEditError] = useState('')
+  const [editSuccess, setEditSuccess] = useState('')
+
+  // 1. Campus / School Switcher Modal State (Interactive "YOUR SCHOOL")
+  const [schoolModalOpen, setSchoolModalOpen] = useState(false)
+  const [campuses, setCampuses] = useState([
+    {
+      id: 'hnu-main',
+      abbr: 'HNU',
+      name: 'Holy Name University',
+      subtitle: 'Main Campus canteen',
+      campusLocation: 'Dampas District, Tagbilaran City, Bohol',
+      code: 'HNU-TAGB',
+      hours: '6:00 AM – 6:00 PM',
+      stallsCount: 2,
+      active: true,
+    },
+    {
+      id: 'hnu-bed',
+      abbr: 'HNU-B',
+      name: 'Holy Name University — Basic Ed',
+      subtitle: 'City Campus canteen',
+      campusLocation: 'Lesage St., Tagbilaran City, Bohol',
+      code: 'HNU-BED',
+      hours: '6:30 AM – 4:30 PM',
+      stallsCount: 1,
+      active: false,
+    },
+    {
+      id: 'hnu-janssen',
+      abbr: 'HNU-J',
+      name: 'Holy Name University — Janssen Annex',
+      subtitle: 'Heights Annex Food Hub',
+      campusLocation: 'Janssen Heights, Dampas, Tagbilaran City',
+      code: 'HNU-JANS',
+      hours: '7:00 AM – 5:00 PM',
+      stallsCount: 1,
+      active: false,
+    },
+  ])
+  const activeCampus = campuses.find(c => c.active) || campuses[0]
+
+  // 2. Interactive Notifications & Refresh Sync States (Persisted in localStorage)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('smartbite_notifications')
+      if (saved !== null) {
+        return JSON.parse(saved)
+      }
+    } catch {}
+    return [
+      {
+        id: 'notif-1',
+        title: 'Order Ready for Pickup! 🍜',
+        message: 'Meal Ticket #ORD-1002 (Pork Tonkatsu Bowl) is freshly prepared at Station A.',
+        time: '3m ago',
+        type: 'order',
+        unread: true,
+      },
+      {
+        id: 'notif-2',
+        title: 'Wallet Balance Active 💳',
+        message: 'Canteen wallet verified. Available student balance: ₱500.00 for counter payment.',
+        time: '18m ago',
+        type: 'balance',
+        unread: true,
+      },
+      {
+        id: 'notif-3',
+        title: 'Kitchen Breakfast Special ☕',
+        message: 'Breakfast combo & fresh brewed espresso available until 10:30 AM.',
+        time: '1h ago',
+        type: 'announcement',
+        unread: false,
+      },
+    ]
   })
+
+  // Synchronize notifications to localStorage so cleared items stay cleared across refresh
+  useEffect(() => {
+    try {
+      localStorage.setItem('smartbite_notifications', JSON.stringify(notifications))
+    } catch {}
+  }, [notifications])
+
+  const handleClearAllNotifications = () => {
+    setNotifications([])
+    try {
+      localStorage.setItem('smartbite_notifications', JSON.stringify([]))
+    } catch {}
+  }
+
+  const handleDismissNotification = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== id)
+      try {
+        localStorage.setItem('smartbite_notifications', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [syncToast, setSyncToast] = useState('')
+
+  // 3. User Profile & Canteen Wallet Modal
+  const [userProfileModalOpen, setUserProfileModalOpen] = useState(false)
+  const [topUpSuccess, setTopUpSuccess] = useState('')
+
+  const handleTopUpBalance = async (amount: number) => {
+    const updatedBalance = Number(currentUser.balance || 0) + amount
+    await canteenApi.auth.updateProfile(currentUser.id, { balance: updatedBalance })
+    setCurrentUser(prev => ({ ...prev, balance: updatedBalance }))
+    setTopUpSuccess(`✓ Successfully added ₱${amount}.00! New Balance: ₱${updatedBalance}.00`)
+    setTimeout(() => setTopUpSuccess(''), 2500)
+    await refreshAllData()
+  }
+
+  const handleRefreshSync = async () => {
+    setIsRefreshing(true)
+    await refreshAllData()
+    setTimeout(() => {
+      setIsRefreshing(false)
+      setSyncToast('✓ Canteen data synced from Supabase!')
+      setTimeout(() => setSyncToast(''), 2500)
+    }, 650)
+  }
+
+  // Logged-in Profile (Persisted across browser refresh)
+  const [currentUser, setCurrentUser] = useState<Profile>(() => {
+    try {
+      const saved = localStorage.getItem('smartbite_session_user')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && parsed.student_id) return parsed
+      }
+    } catch {}
+    return {
+      id: 'p-1',
+      student_id: '2025-01234',
+      full_name: 'Rommel Custodio',
+      grade_or_dept: 'Grade 12 - STEM',
+      role: 'student',
+      balance: 500.0,
+    }
+  })
+
+  // Automatically persist user session to localStorage whenever updated
+  useEffect(() => {
+    if (loggedIn && currentUser && currentUser.student_id) {
+      try {
+        localStorage.setItem('smartbite_session_user', JSON.stringify(currentUser))
+      } catch {}
+    }
+  }, [loggedIn, currentUser])
 
   // Navigation Tabs per Role
   const [studentNavTab, setStudentNavTab] = useState<'menu' | 'active_ticket' | 'history'>('menu')
   const [staffNavTab, setStaffNavTab] = useState<'kds' | 'menu_crud' | 'inventory_crud'>('kds')
   const [branchNavTab, setBranchNavTab] = useState<'overview' | 'stall_1' | 'stall_2'>('overview')
-  const [adminNavTab, setAdminNavTab] = useState<'overview' | 'orders' | 'menu' | 'inventory' | 'users' | 'analytics' | 'audit' | 'sql'>('overview')
+  const [branchSubTab, setBranchSubTab] = useState<'orders' | 'menu' | 'inventory' | 'staff'>('orders')
+  const [branchOrderFilter, setBranchOrderFilter] = useState<'all' | 'Order placed' | 'Preparing' | 'Ready for pickup' | 'Completed'>('all')
+  const [adminNavTab, setAdminNavTab] = useState<'overview' | 'orders' | 'menu' | 'inventory' | 'users' | 'analytics'>('overview')
 
   // Global Data
   const [stalls, setStalls] = useState<Stall[]>([])
@@ -305,6 +557,13 @@ export default function App() {
   const [itemFormPrepTime, setItemFormPrepTime] = useState(10)
   const [itemFormImage, setItemFormImage] = useState('https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
   const [itemFormAvailable, setItemFormAvailable] = useState(true)
+
+  // Staff & Admin Inventory Stock Management Modal
+  const [stockModalOpen, setStockModalOpen] = useState(false)
+  const [editingStockItem, setEditingStockItem] = useState<InventoryItem | null>(null)
+  const [stockFormQty, setStockFormQty] = useState<string | number>(0)
+  const [stockFormMin, setStockFormMin] = useState<string | number>(10)
+  const [stockModalToast, setStockModalToast] = useState<string>('')
 
   // Admin User Filter
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | UserRole>('all')
@@ -339,6 +598,20 @@ export default function App() {
         o => o.order_status !== 'Completed' && o.order_status !== 'Cancelled'
       )
       if (active) setActiveOrder(active)
+
+      // Keep active session profile updated with live database values
+      if (profilesData && profilesData.length > 0) {
+        const savedSession = localStorage.getItem('smartbite_session_user')
+        if (savedSession) {
+          try {
+            const parsed = JSON.parse(savedSession)
+            const fresh = profilesData.find(p => p.id === parsed.id || p.student_id === parsed.student_id)
+            if (fresh) {
+              setCurrentUser(prev => ({ ...prev, ...fresh }))
+            }
+          } catch {}
+        }
+      }
     } catch (err) {
       console.warn('Refresh notice:', err)
     }
@@ -418,18 +691,33 @@ export default function App() {
           balance: chosenRole === 'admin' ? 5000 : chosenRole === 'stall_manager' ? 3500 : chosenRole === 'staff' ? 1200 : 500,
         }
 
+    try {
+      localStorage.setItem('smartbite_session_user', JSON.stringify(resolvedUser))
+    } catch {}
     setCurrentUser(resolvedUser)
     setLoggedIn(true)
     setAuthError('')
   }
 
-  // Handle Sign Up (Uses First Name, Middle Name, Last Name)
+  // Handle Sign Up (Uses First Name, Middle Name, Last Name with strict validations)
   const handleSignUp = async (e: FormEvent) => {
     e.preventDefault()
-    if (!regFirstName.trim() || !regLastName.trim() || !regStudentId.trim() || !regPassword.trim()) {
-      setAuthError('Please fill in First Name, Last Name, ID, and Password.')
-      return
-    }
+    setAuthError('')
+
+    const fnErr = validateName(regFirstName, 'First Name')
+    if (fnErr) { setAuthError(fnErr); return }
+
+    const mnErr = validateOptionalMiddleName(regMiddleName)
+    if (mnErr) { setAuthError(mnErr); return }
+
+    const lnErr = validateName(regLastName, 'Last Name')
+    if (lnErr) { setAuthError(lnErr); return }
+
+    const idErr = validateIdNumber(regStudentId, undefined, userProfiles)
+    if (idErr) { setAuthError(idErr); return }
+
+    const pwdErr = validatePassword(regPassword)
+    if (pwdErr) { setAuthError(pwdErr); return }
 
     const fullName = `${regFirstName.trim()} ${regMiddleName.trim() ? regMiddleName.trim() + ' ' : ''}${regLastName.trim()}`.trim()
 
@@ -445,6 +733,9 @@ export default function App() {
       balance: 500.0,
     })
 
+    try {
+      localStorage.setItem('smartbite_session_user', JSON.stringify(newProfile))
+    } catch {}
     setCurrentUser(newProfile)
     setLoggedIn(true)
     setAuthError('')
@@ -461,8 +752,9 @@ export default function App() {
       setPwdError('Current password is incorrect.')
       return
     }
-    if (newPwd.length < 4) {
-      setPwdError('New password must be at least 4 characters.')
+    const pwdErr = validatePassword(newPwd)
+    if (pwdErr) {
+      setPwdError(pwdErr)
       return
     }
     if (newPwd !== confirmPwd) {
@@ -488,10 +780,20 @@ export default function App() {
     setAdminUserModalError('')
     setAdminUserModalSuccess('')
 
-    if (!newFirstName.trim() || !newLastName.trim() || !newUserId.trim()) {
-      setAdminUserModalError('Please enter First Name, Last Name, and User ID.')
-      return
-    }
+    const fnErr = validateName(newFirstName, 'First Name')
+    if (fnErr) { setAdminUserModalError(fnErr); return }
+
+    const mnErr = validateOptionalMiddleName(newMiddleName)
+    if (mnErr) { setAdminUserModalError(mnErr); return }
+
+    const lnErr = validateName(newLastName, 'Last Name')
+    if (lnErr) { setAdminUserModalError(lnErr); return }
+
+    const idErr = validateIdNumber(newUserId, undefined, userProfiles)
+    if (idErr) { setAdminUserModalError(idErr); return }
+
+    const pwdErr = validatePassword(newPassword)
+    if (pwdErr) { setAdminUserModalError(pwdErr); return }
 
     let assignedStallId = newStallId
 
@@ -546,6 +848,11 @@ export default function App() {
   const handleAdminResetPassword = async (e: FormEvent) => {
     e.preventDefault()
     if (!adminResetUser || !adminResetNewPwd.trim()) return
+    const pwdErr = validatePassword(adminResetNewPwd)
+    if (pwdErr) {
+      alert(pwdErr)
+      return
+    }
     await canteenApi.auth.changePassword(adminResetUser.id, adminResetNewPwd.trim())
     await refreshAllData()
     alert(`Password reset for ${adminResetUser.full_name}!`)
@@ -553,8 +860,182 @@ export default function App() {
     setAdminResetNewPwd('')
   }
 
+  // Open Edit User Modal (Change Name, First/Middle/Last, ID Number, Role, Dept, Balance, Stall)
+  const openEditUserModal = (user: Profile) => {
+    setAdminEditUser(user)
+    let fName = user.first_name || ''
+    let mName = user.middle_name || ''
+    let lName = user.last_name || ''
+    if (!fName && !lName && user.full_name) {
+      const parts = user.full_name.trim().split(' ')
+      if (parts.length === 1) {
+        fName = parts[0]
+      } else if (parts.length === 2) {
+        fName = parts[0]
+        lName = parts[1]
+      } else {
+        fName = parts[0]
+        mName = parts.slice(1, -1).join(' ')
+        lName = parts[parts.length - 1]
+      }
+    }
+    setEditFirstName(fName)
+    setEditMiddleName(mName)
+    setEditLastName(lName)
+    setEditStudentId(user.student_id)
+    setEditRole(user.role)
+    setEditDept(user.grade_or_dept || '')
+    setEditBalance(user.balance || 0)
+    setEditStallId(user.stall_id || 1)
+    setEditError('')
+    setEditSuccess('')
+  }
+
+  // Save Edit User Changes (Updates Name, ID, Role, Dept, Balance, Stall)
+  const handleSaveEditUser = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!adminEditUser) return
+    setEditError('')
+    setEditSuccess('')
+
+    const fnErr = validateName(editFirstName, 'First Name')
+    if (fnErr) { setEditError(fnErr); return }
+
+    const mnErr = validateOptionalMiddleName(editMiddleName)
+    if (mnErr) { setEditError(mnErr); return }
+
+    const lnErr = validateName(editLastName, 'Last Name')
+    if (lnErr) { setEditError(lnErr); return }
+
+    const idErr = validateIdNumber(editStudentId, adminEditUser.id, userProfiles)
+    if (idErr) { setEditError(idErr); return }
+
+    const fullName = `${editFirstName.trim()} ${editMiddleName.trim() ? editMiddleName.trim() + ' ' : ''}${editLastName.trim()}`.trim()
+
+    const updates: Partial<Profile> = {
+      first_name: editFirstName.trim(),
+      middle_name: editMiddleName.trim(),
+      last_name: editLastName.trim(),
+      full_name: fullName,
+      student_id: editStudentId.trim(),
+      role: editRole,
+      grade_or_dept: editDept.trim() || 'General',
+      balance: Number(editBalance) || 0,
+      stall_id: (editRole === 'staff' || editRole === 'stall_manager') ? editStallId : undefined,
+    }
+
+    await canteenApi.auth.updateProfile(adminEditUser.id, updates)
+
+    if (currentUser.id === adminEditUser.id) {
+      setCurrentUser(prev => ({ ...prev, ...updates }))
+    }
+
+    setEditSuccess(`✓ Account details for ${fullName} updated successfully!`)
+    await refreshAllData()
+    setTimeout(() => {
+      setAdminEditUser(null)
+      setEditSuccess('')
+    }, 1200)
+  }
+
+  // Open Edit Stock Modal (directly edit stock quantity)
+  const openEditStockModal = (item: InventoryItem) => {
+    setEditingStockItem(item)
+    setStockFormQty(item.current_stock)
+    setStockFormMin(item.minimum_threshold)
+    setStockModalToast('')
+    setStockModalOpen(true)
+  }
+
+  // Save Stock Updates (directly edits stock balance & threshold)
+  const handleSaveStock = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!editingStockItem) return
+    const parsedQty = parseFloat(String(stockFormQty))
+    const parsedMin = parseFloat(String(stockFormMin))
+    const newStock = Math.max(0, isNaN(parsedQty) ? 0 : parsedQty)
+    const newMin = Math.max(0, isNaN(parsedMin) ? 0 : parsedMin)
+    const itemId = Number(editingStockItem.id)
+    const itemName = editingStockItem.item_name
+    const itemUnit = editingStockItem.unit_of_measure
+
+    // 1. Optimistic update in memory state
+    setInventoryList(prev =>
+      prev.map(item =>
+        Number(item.id) === itemId
+          ? { ...item, current_stock: newStock, minimum_threshold: newMin }
+          : item
+      )
+    )
+
+    // 2. Direct localStorage update as immediate persistence
+    try {
+      const saved = localStorage.getItem('smartbite_inventory')
+      let list: InventoryItem[] = saved ? JSON.parse(saved) : []
+      if (!Array.isArray(list) || list.length === 0) {
+        list = inventoryList
+      }
+      const updated = list.map(item =>
+        Number(item.id) === itemId
+          ? { ...item, current_stock: newStock, minimum_threshold: newMin }
+          : item
+      )
+      localStorage.setItem('smartbite_inventory', JSON.stringify(updated))
+    } catch {}
+
+    setSyncToast(`✓ Updated ${itemName} stock to ${newStock} ${itemUnit}`)
+    setTimeout(() => setSyncToast(''), 3000)
+
+    setStockModalOpen(false)
+    setEditingStockItem(null)
+
+    // 3. Persist to API
+    await canteenApi.inventory.update(itemId, {
+      current_stock: newStock,
+      minimum_threshold: newMin,
+    })
+
+    // 4. Refresh all data
+    await refreshAllData()
+  }
+
+  // Quick Restock Handler (+amountToAdd)
+  const handleQuickRestock = async (item: InventoryItem, amountToAdd: number) => {
+    const itemId = Number(item.id)
+    const currentStock = Number(item.current_stock) || 0
+    const newStock = Math.max(0, currentStock + amountToAdd)
+
+    // 1. Optimistic update
+    setInventoryList(prev =>
+      prev.map(i => (Number(i.id) === itemId ? { ...i, current_stock: newStock } : i))
+    )
+
+    // 2. Direct localStorage update as immediate persistence
+    try {
+      const saved = localStorage.getItem('smartbite_inventory')
+      let list: InventoryItem[] = saved ? JSON.parse(saved) : []
+      if (!Array.isArray(list) || list.length === 0) {
+        list = inventoryList
+      }
+      const updated = list.map(i => (Number(i.id) === itemId ? { ...i, current_stock: newStock } : i))
+      localStorage.setItem('smartbite_inventory', JSON.stringify(updated))
+    } catch {}
+
+    setSyncToast(`✓ Restocked +${amountToAdd} ${item.unit_of_measure} to ${item.item_name}! (Total: ${newStock})`)
+    setTimeout(() => setSyncToast(''), 3000)
+
+    // 3. Persist to API
+    await canteenApi.inventory.restock(itemId, amountToAdd)
+
+    // 4. Refresh all data
+    await refreshAllData()
+  }
+
   // Handle Logout / Switch Role
   const handleLogout = () => {
+    try {
+      localStorage.removeItem('smartbite_session_user')
+    } catch {}
     setLoggedIn(false)
     setAuthStep('welcome')
     setCart({})
@@ -599,6 +1080,13 @@ export default function App() {
       }))
 
     try {
+      // 1. Immediately deduct ingredient stocks from current inventory (optimistic update)
+      const { updatedInventory } = deductInventoryStock(inventoryList, orderItems)
+      setInventoryList(updatedInventory)
+      try {
+        localStorage.setItem('smartbite_inventory', JSON.stringify(updatedInventory))
+      } catch {}
+
       const orderPayload = {
         order_id: orderId,
         student_id: currentUser.id,
@@ -626,6 +1114,9 @@ export default function App() {
       }
       setActiveOrder(createdOrder)
       setPlaced(true)
+      setCart({})
+      setSyncToast('✓ Order placed! Kitchen notified & ingredient stocks updated.')
+      setTimeout(() => setSyncToast(''), 3000)
     } catch (err: any) {
       alert(`Order error: ${err.message}`)
     } finally {
@@ -634,26 +1125,30 @@ export default function App() {
   }
 
   // Staff CRUD actions
-  const openEditModal = (item: MenuItem) => {
+  const openEditModal = (item: MenuItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setEditingItem(item)
-    setItemFormName(item.name)
-    setItemFormDesc(item.description)
-    setItemFormPrice(item.price)
+    setItemFormName(item.name || '')
+    setItemFormDesc(item.description || '')
+    setItemFormPrice(Number(item.price) || 0)
     setItemFormCategory(item.category || 'Rice Meals')
-    setItemFormStallId(item.stall_id || 1)
-    setItemFormPrepTime(item.preparation_time_minutes || 10)
-    setItemFormImage(item.image_url)
-    setItemFormAvailable(item.is_available)
+    setItemFormStallId(Number(item.stall_id) || 1)
+    setItemFormPrepTime(Number(item.preparation_time_minutes) || 10)
+    setItemFormImage(item.image_url || '')
+    setItemFormAvailable(Boolean(item.is_available))
     setItemModalOpen(true)
   }
 
-  const openCreateModal = () => {
+  const openCreateModal = (defaultStallId?: number | React.MouseEvent) => {
     setEditingItem(null)
     setItemFormName('')
     setItemFormDesc('')
     setItemFormPrice(75)
     setItemFormCategory('Rice Meals')
-    setItemFormStallId(1)
+    setItemFormStallId(typeof defaultStallId === 'number' ? defaultStallId : 1)
     setItemFormPrepTime(10)
     setItemFormImage('https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
     setItemFormAvailable(true)
@@ -664,7 +1159,7 @@ export default function App() {
     e.preventDefault()
     try {
       if (editingItem) {
-        await canteenApi.menu.updateItem(editingItem.id, {
+        const updatedFields: Partial<MenuItem> = {
           name: itemFormName,
           description: itemFormDesc,
           price: itemFormPrice,
@@ -673,9 +1168,14 @@ export default function App() {
           preparation_time_minutes: itemFormPrepTime,
           image_url: itemFormImage,
           is_available: itemFormAvailable,
-        })
+        }
+        setItems(prev => prev.map(i => (Number(i.id) === Number(editingItem.id) ? { ...i, ...updatedFields } : i)))
+        setItemModalOpen(false)
+        setSyncToast(`✓ Updated ${itemFormName}!`)
+        setTimeout(() => setSyncToast(''), 2500)
+        await canteenApi.menu.updateItem(Number(editingItem.id), updatedFields)
       } else {
-        await canteenApi.menu.createItem({
+        const newItemPayload = {
           category_id: 1,
           name: itemFormName,
           description: itemFormDesc,
@@ -686,12 +1186,16 @@ export default function App() {
           image_url: itemFormImage,
           is_available: itemFormAvailable,
           rating: '4.8',
-        })
+        }
+        const created = await canteenApi.menu.createItem(newItemPayload)
+        setItems(prev => [...prev, created])
+        setItemModalOpen(false)
+        setSyncToast(`✓ Added ${itemFormName} to menu!`)
+        setTimeout(() => setSyncToast(''), 2500)
       }
-      setItemModalOpen(false)
-      refreshAllData()
     } catch (err: any) {
-      alert(`CRUD Error: ${err.message}`)
+      console.warn('handleSaveMenuItem notice:', err)
+      setItemModalOpen(false)
     }
   }
 
@@ -699,9 +1203,40 @@ export default function App() {
     if (!window.confirm('Are you sure you want to delete this menu item?')) return
     try {
       await canteenApi.menu.deleteItem(id)
-      refreshAllData()
+      setItems(prev => prev.filter(i => i.id !== id))
     } catch (err: any) {
       alert(`Delete error: ${err.message}`)
+    }
+  }
+
+  // Quick toggle item availability (Available / Sold Out)
+  const handleToggleItemAvailable = async (item: MenuItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    try {
+      const nextStatus = !item.is_available
+      setItems(prev => prev.map(i => (i.id === item.id ? { ...i, is_available: nextStatus } : i)))
+
+      // Update localStorage synchronously as fallback
+      try {
+        const saved = localStorage.getItem('smartbite_menu_items')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map((i: MenuItem) => (i.id === item.id ? { ...i, is_available: nextStatus } : i))
+            localStorage.setItem('smartbite_menu_items', JSON.stringify(updated))
+          }
+        }
+      } catch {}
+
+      setSyncToast(`✓ ${item.name} marked as ${nextStatus ? 'Available' : 'Sold Out'}`)
+      setTimeout(() => setSyncToast(''), 2500)
+
+      await canteenApi.menu.updateItem(item.id, { is_available: nextStatus })
+    } catch (err: any) {
+      console.warn('handleToggleItemAvailable notice:', err)
     }
   }
 
@@ -940,7 +1475,7 @@ export default function App() {
                 <div className="auth-input-box">
                   <input
                     value={regFirstName}
-                    onChange={e => setRegFirstName(e.target.value)}
+                    onChange={e => setRegFirstName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                     placeholder="First Name *"
                     required
                   />
@@ -948,19 +1483,22 @@ export default function App() {
                 <div className="auth-input-box">
                   <input
                     value={regMiddleName}
-                    onChange={e => setRegMiddleName(e.target.value)}
+                    onChange={e => setRegMiddleName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                     placeholder="Middle Name"
                   />
                 </div>
                 <div className="auth-input-box">
                   <input
                     value={regLastName}
-                    onChange={e => setRegLastName(e.target.value)}
+                    onChange={e => setRegLastName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                     placeholder="Last Name *"
                     required
                   />
                 </div>
               </div>
+              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                Letters only (no numbers or special characters allowed)
+              </small>
             </div>
 
             <div className="auth-field">
@@ -968,11 +1506,15 @@ export default function App() {
               <div className="auth-input-box" style={{ marginTop: '7px' }}>
                 <input
                   value={regStudentId}
-                  onChange={e => setRegStudentId(e.target.value)}
-                  placeholder="e.g. 2025-09876"
+                  onChange={e => setRegStudentId(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 20250123"
+                  maxLength={12}
                   required
                 />
               </div>
+              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                Numbers only (digits 0-9, unique ID, cannot be all the same repeating digit)
+              </small>
             </div>
 
             <div className="auth-field">
@@ -993,8 +1535,8 @@ export default function App() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={regPassword}
-                  onChange={e => setRegPassword(e.target.value)}
-                  placeholder="Choose a password"
+                  onChange={e => setRegPassword(e.target.value.replace(/\s/g, ''))}
+                  placeholder="Choose password (min 6 chars)"
                   required
                 />
                 <button
@@ -1006,6 +1548,9 @@ export default function App() {
                   <Icon name={showPassword ? 'eye-off' : 'eye'} size={17} />
                 </button>
               </div>
+              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                Must mix letters and numbers &bull; No spaces allowed
+              </small>
             </div>
 
             {authError && <div className="auth-error-pill">{authError}</div>}
@@ -1046,14 +1591,20 @@ export default function App() {
           <span className="sidebar-brand-name">Smartbite</span>
         </div>
 
-        {/* School Selector Card matching Screenshot 3 & 4 */}
+        {/* School Selector Card matching Screenshot 3 & 4 (Interactive Campus Directory) */}
         <div className="sidebar-school-wrap">
           <div className="sidebar-section-kicker">YOUR SCHOOL</div>
-          <div className="sidebar-school-card">
-            <div className="school-badge-square">HNU</div>
+          <div
+            className="sidebar-school-card"
+            onClick={() => setSchoolModalOpen(true)}
+            role="button"
+            tabIndex={0}
+            title="Click to view campus details or switch campus"
+          >
+            <div className="school-badge-square">{activeCampus.abbr}</div>
             <div className="school-info-text">
-              <strong>Holy Name University</strong>
-              <small>Campus canteen</small>
+              <strong>{activeCampus.name}</strong>
+              <small>{activeCampus.subtitle}</small>
             </div>
             <Icon name="chevron-down" size={16} />
           </div>
@@ -1112,20 +1663,6 @@ export default function App() {
                 <span>Team / Users</span>
                 <span className="nav-badge">{userProfiles.length}</span>
               </button>
-              <button
-                className={`sidebar-nav-btn ${adminNavTab === 'sql' ? 'active' : ''}`}
-                onClick={() => setAdminNavTab('sql')}
-              >
-                <Icon name="database" size={17} />
-                <span>SQL Studio</span>
-              </button>
-              <button
-                className={`sidebar-nav-btn ${adminNavTab === 'audit' ? 'active' : ''}`}
-                onClick={() => setAdminNavTab('audit')}
-              >
-                <Icon name="shield" size={17} />
-                <span>Audit Trail</span>
-              </button>
             </>
           )}
 
@@ -1137,7 +1674,7 @@ export default function App() {
                 onClick={() => setStaffNavTab('kds')}
               >
                 <Icon name="chef" size={17} />
-                <span>Live KDS Queue</span>
+                <span>Live Queue</span>
                 <span className="nav-badge">{allOrders.filter(o => o.order_status !== 'Completed').length}</span>
               </button>
               <button
@@ -1145,7 +1682,7 @@ export default function App() {
                 onClick={() => setStaffNavTab('menu_crud')}
               >
                 <Icon name="edit" size={17} />
-                <span>Menu Items CRUD</span>
+                <span>Menu Items </span>
                 <span className="nav-badge">{items.length}</span>
               </button>
               <button
@@ -1216,7 +1753,13 @@ export default function App() {
 
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
-          <div className="sidebar-user-chip">
+          <div
+            className="sidebar-user-chip"
+            onClick={() => setUserProfileModalOpen(true)}
+            role="button"
+            tabIndex={0}
+            title="Click to view Account Profile & Top-Up Wallet"
+          >
             <div className="user-avatar-circle">
               {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : 'U'}
             </div>
@@ -1249,10 +1792,18 @@ export default function App() {
 
       {/* 2B. MAIN VIEWPORT */}
       <div className="app-main-viewport">
+        {/* Floating Sync Feedback Toast */}
+        {syncToast && (
+          <div className="floating-sync-toast">
+            <Icon name="check" size={15} />
+            <span>{syncToast}</span>
+          </div>
+        )}
+
         {/* Topbar */}
         <header className="app-topbar">
           <div className="topbar-breadcrumb">
-            <span>Holy Name University</span>
+            <span>{activeCampus.name}</span>
             <span>/</span>
             <strong>
               {currentUser.role === 'admin'
@@ -1260,7 +1811,9 @@ export default function App() {
                 : currentUser.role === 'staff'
                 ? 'Kitchen operations'
                 : currentUser.role === 'stall_manager'
-                ? 'Branch manager'
+                ? branchNavTab === 'overview'
+                  ? 'Branch Operations • 2 Branches Overview'
+                  : `Branch Operations • ${stalls.find(s => branchNavTab === 'stall_1' ? s.id === 1 : s.id === 2)?.name || 'Branch'}`
                 : 'Student canteen'}
             </strong>
           </div>
@@ -1269,35 +1822,8 @@ export default function App() {
             {/* Live Open Status Pill */}
             <div className="status-pill-open">
               <span className="live-dot" />
-              <span>Canteen open &bull; start 6:00 AM until 6:00 PM</span>
+              <span>Canteen open &bull; {activeCampus.hours}</span>
             </div>
-
-            {/* Supabase Status */}
-            {supabaseConnected !== null && (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '5px 10px',
-                  borderRadius: '20px',
-                  background: supabaseConnected ? '#DCFCE7' : '#FEE2E2',
-                  color: supabaseConnected ? '#15803D' : '#991B1B',
-                }}
-              >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: supabaseConnected ? '#22C55E' : '#EF4444',
-                  }}
-                />
-                <span>{supabaseConnected ? 'Supabase Live' : 'Supabase Offline'}</span>
-              </div>
-            )}
 
             {/* Cart Button for Students */}
             {currentUser.role === 'student' && (
@@ -1320,12 +1846,187 @@ export default function App() {
               <Icon name="key" size={17} />
             </button>
 
-            <button className="icon-action-btn" title="Notifications">
-              <Icon name="bell" size={17} />
-            </button>
-            <button className="icon-action-btn" onClick={refreshAllData} title="Refresh System">
+            {/* Notification Bell Button with Interactive Popover */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className="icon-action-btn"
+                onClick={() => setNotificationsOpen(prev => !prev)}
+                title="Notifications & Alerts"
+              >
+                <Icon name="bell" size={17} />
+                {notifications.filter(n => n.unread).length > 0 && (
+                  <span className="notification-count-badge">
+                    {notifications.filter(n => n.unread).length}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications Popover Dropdown */}
+              {notificationsOpen && (
+                <div className="notifications-dropdown">
+                  <div className="notifications-header">
+                    <div>
+                      <strong style={{ fontSize: '14px', fontFamily: 'var(--font-serif)', color: 'var(--ink)' }}>Notifications</strong>
+                      <small style={{ color: 'var(--muted)', display: 'block', fontSize: '11px' }}>
+                        {notifications.filter(n => n.unread).length} unread updates
+                      </small>
+                    </div>
+                    {notifications.some(n => n.unread) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotifications(prev => {
+                            const updated = prev.map(n => ({ ...n, unread: false }))
+                            try {
+                              localStorage.setItem('smartbite_notifications', JSON.stringify(updated))
+                            } catch {}
+                            return updated
+                          })
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="notifications-list">
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+                        <div
+                          style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            background: '#F0FDF4',
+                            color: '#16A34A',
+                            display: 'grid',
+                            placeItems: 'center',
+                            margin: '0 auto 10px',
+                          }}
+                        >
+                          <Icon name="check" size={20} />
+                        </div>
+                        <strong style={{ display: 'block', fontSize: '13px', color: 'var(--ink)' }}>All caught up!</strong>
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--muted)' }}>
+                          No notifications or alerts. Cleared notifications won't reappear.
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map(notif => (
+                        <div
+                          key={notif.id}
+                          className={`notification-item-card ${notif.unread ? 'unread' : ''}`}
+                          onClick={() => {
+                            setNotifications(prev => {
+                              const updated = prev.map(n => (n.id === notif.id ? { ...n, unread: false } : n))
+                              try {
+                                localStorage.setItem('smartbite_notifications', JSON.stringify(updated))
+                              } catch {}
+                              return updated
+                            })
+                            if (notif.type === 'order') {
+                              if (currentUser.role === 'student') setStudentNavTab('active_ticket')
+                              else if (currentUser.role === 'admin') setAdminNavTab('orders')
+                            }
+                          }}
+                        >
+                          <div className={`notification-item-icon ${notif.type}`}>
+                            <Icon name={notif.type === 'order' ? 'bag' : notif.type === 'balance' ? 'receipt' : 'bell'} size={15} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <strong style={{ fontSize: '12px', color: 'var(--ink)' }}>{notif.title}</strong>
+                              <span style={{ fontSize: '10px', color: 'var(--muted)' }}>{notif.time}</span>
+                            </div>
+                            <p style={{ margin: '3px 0 0', fontSize: '11px', color: 'var(--ink-secondary)', lineHeight: 1.4 }}>
+                              {notif.message}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDismissNotification(notif.id, e)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--muted)',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              lineHeight: 1,
+                              borderRadius: '4px',
+                              alignSelf: 'flex-start',
+                            }}
+                            title="Dismiss notification"
+                          >
+                            <Icon name="x" size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="notifications-footer">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifications(prev => [
+                          ...prev,
+                          {
+                            id: `notif-${Date.now()}`,
+                            title: 'Canteen Kitchen Alert 🔔',
+                            message: 'New batch of fresh fruit shakes and meals arrived at Canteen Station A.',
+                            time: 'Just now',
+                            type: 'announcement',
+                            unread: true,
+                          },
+                        ])
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary)',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      + Test Alert
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearAllNotifications}
+                      disabled={notifications.length === 0}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: notifications.length === 0 ? 'var(--line-strong)' : '#EF4444',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: notifications.length === 0 ? 'default' : 'pointer',
+                      }}
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Refresh Button with Active Spinning Feedback */}
+            <button
+              className={`icon-action-btn ${isRefreshing ? 'spinning' : ''}`}
+              onClick={handleRefreshSync}
+              title="Refresh and sync canteen data"
+            >
               <Icon name="refresh" size={17} />
             </button>
+
             <button className="icon-action-btn" onClick={handleLogout} title="Exit">
               <Icon name="logout" size={17} />
             </button>
@@ -1643,14 +2344,22 @@ export default function App() {
                 </div>
               )}
 
-              {/* ADMIN TAB 3: MENU INSPECTOR */}
+              {/* ADMIN TAB 3: MENU INSPECTOR & CRUD */}
               {adminNavTab === 'menu' && (
                 <div className="card-panel">
-                  <div className="card-panel-header">
+                  <div className="card-panel-header" style={{ alignItems: 'center' }}>
                     <div>
                       <h3>Campus Menu Catalog ({items.length} items)</h3>
-                      <p>Current offerings across all canteen stalls</p>
+                      <p>Current offerings across all canteen stalls &bull; Click status or actions to edit</p>
                     </div>
+                    <button
+                      type="button"
+                      className="auth-btn-primary"
+                      onClick={openCreateModal}
+                      style={{ width: 'auto', padding: '0 16px', height: '36px', fontSize: '12px' }}
+                    >
+                      <Icon name="plus" size={15} /> Add Food Item
+                    </button>
                   </div>
                   <div className="data-table-wrap">
                     <table className="data-table">
@@ -1662,6 +2371,7 @@ export default function App() {
                           <th>Price</th>
                           <th>Prep Time</th>
                           <th>Status</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1685,11 +2395,52 @@ export default function App() {
                             <td>{stalls.find(s => s.id === item.stall_id)?.name || `Stall #${item.stall_id}`}</td>
                             <td>{item.category}</td>
                             <td><strong>₱{item.price}.00</strong></td>
-                            <td>{item.preparation_time_minutes} mins</td>
                             <td>
-                              <span className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}>
-                                {item.is_available ? 'Available' : 'Sold Out'}
-                              </span>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{ padding: '3px 8px', fontSize: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={e => openEditModal(item, e)}
+                                title="Click to edit Prep Time & Details"
+                              >
+                                <span>{item.preparation_time_minutes} mins</span>
+                                <Icon name="edit" size={11} />
+                              </button>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}
+                                style={{ border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={e => handleToggleItemAvailable(item, e)}
+                                title="Click to toggle Available / Sold Out"
+                              >
+                                <span>{item.is_available ? 'Available' : 'Sold Out'}</span>
+                              </button>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="auth-btn-primary"
+                                  onClick={e => openEditModal(item, e)}
+                                  style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', height: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                  title="Edit full dish details"
+                                >
+                                  <Icon name="edit" size={12} />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => handleDeleteMenuItem(item.id)}
+                                  style={{ padding: '4px 8px', fontSize: '11px', color: '#b91c1c', height: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                  title="Delete item"
+                                >
+                                  <Icon name="trash" size={12} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1717,7 +2468,7 @@ export default function App() {
                           <th>Branch</th>
                           <th>Stock Balance</th>
                           <th>Minimum Safe Level</th>
-                          <th>Status</th>
+                          <th>Restock &amp; Edit Stock</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1735,9 +2486,27 @@ export default function App() {
                               </td>
                               <td>{inv.minimum_threshold} {inv.unit_of_measure}</td>
                               <td>
-                                <span className={`status-pill ${isLow ? 'cancelled' : 'ready'}`}>
-                                  {isLow ? 'Low Stock' : 'Healthy'}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    className="auth-btn-primary"
+                                    style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', height: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    onClick={() => openEditStockModal(inv)}
+                                    title="Edit stock quantity directly"
+                                  >
+                                    <Icon name="edit" size={12} />
+                                    <span>Edit Stock</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    style={{ padding: '4px 8px', fontSize: '11px', height: '28px' }}
+                                    onClick={() => handleQuickRestock(inv, 25)}
+                                    title={`Quick restock +25 ${inv.unit_of_measure}`}
+                                  >
+                                    + Restock (+25 {inv.unit_of_measure})
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -1899,6 +2668,15 @@ export default function App() {
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                   <button
                                     className="btn-secondary"
+                                    onClick={() => openEditUserModal(user)}
+                                    style={{ padding: '3px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--primary)', fontWeight: 700 }}
+                                    title="Edit User Name, ID Number, Role, and Details"
+                                  >
+                                    <Icon name="edit" size={12} />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    className="btn-secondary"
                                     onClick={() => {
                                       setAdminResetUser(user)
                                       setAdminResetNewPwd('')
@@ -1942,66 +2720,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* ADMIN TAB 6: SQL STUDIO */}
-              {adminNavTab === 'sql' && (
-                <SqlEditor
-                  onClose={() => {
-                    setAdminNavTab('overview')
-                    refreshAllData()
-                  }}
-                />
-              )}
-
-              {/* ADMIN TAB 7: TRIGGER AUDIT TRAIL */}
-              {adminNavTab === 'audit' && (
-                <div className="card-panel">
-                  <div className="card-panel-header">
-                    <div>
-                      <h3>PostgreSQL Trigger Audit Trail</h3>
-                      <p>Automated database logs captured by trg_audit_orders and security procedures</p>
-                    </div>
-                    <button className="btn-secondary" onClick={refreshAllData}>
-                      <Icon name="refresh" size={14} /> Refresh Logs
-                    </button>
-                  </div>
-                  <div className="data-table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>Table</th>
-                          <th>Record Key</th>
-                          <th>Action</th>
-                          <th>Change Summary</th>
-                          <th>Timestamp</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {auditLogList.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
-                              No audit records captured yet.
-                            </td>
-                          </tr>
-                        ) : (
-                          auditLogList.map(log => (
-                            <tr key={log.id}>
-                              <td>#{log.id}</td>
-                              <td><code>{log.table_name}</code></td>
-                              <td>{log.record_id}</td>
-                              <td>
-                                <span className="status-pill ready">{log.action}</span>
-                              </td>
-                              <td>{log.change_summary || 'Trigger execution'}</td>
-                              <td>{new Date(log.created_at).toLocaleTimeString()}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -2045,19 +2763,19 @@ export default function App() {
                   className={`filter-pill-btn ${staffNavTab === 'kds' ? 'active' : ''}`}
                   onClick={() => setStaffNavTab('kds')}
                 >
-                  Live KDS Queue ({allOrders.length})
+                  Live Queue ({allOrders.length})
                 </button>
                 <button
                   className={`filter-pill-btn ${staffNavTab === 'menu_crud' ? 'active' : ''}`}
                   onClick={() => setStaffNavTab('menu_crud')}
                 >
-                  Menu Items CRUD ({items.length})
+                  Menu Items  ({items.length})
                 </button>
                 <button
                   className={`filter-pill-btn ${staffNavTab === 'inventory_crud' ? 'active' : ''}`}
                   onClick={() => setStaffNavTab('inventory_crud')}
                 >
-                  Ingredient Stock CRUD ({inventoryList.length})
+                  Ingredient Stock  ({inventoryList.length})
                 </button>
               </div>
 
@@ -2066,7 +2784,7 @@ export default function App() {
                 <div className="card-panel">
                   <div className="card-panel-header">
                     <div>
-                      <h3>Live Kitchen KDS Queue</h3>
+                      <h3>Live Kitchen  Queue</h3>
                       <p>Orders awaiting cooking, prep, and counter pickup</p>
                     </div>
                     <button className="btn-secondary" onClick={refreshAllData}>
@@ -2170,7 +2888,7 @@ export default function App() {
                 <div className="card-panel">
                   <div className="card-panel-header">
                     <div>
-                      <h3>Menu Catalog Manager (Add / Edit / Delete)</h3>
+                      <h3>Menu Catalog Manager</h3>
                       <p>You can create new food items, adjust prices, and toggle availability</p>
                     </div>
                     <button className="btn-secondary" onClick={openCreateModal}>
@@ -2205,17 +2923,34 @@ export default function App() {
                             <td>{stalls.find(s => s.id === item.stall_id)?.name || `Branch #${item.stall_id}`}</td>
                             <td>{item.category}</td>
                             <td><strong style={{ color: 'var(--primary)' }}>₱{item.price}.00</strong></td>
-                            <td>{item.preparation_time_minutes} mins</td>
                             <td>
-                              <span className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}>
-                                {item.is_available ? 'Available' : 'Sold Out'}
-                              </span>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{ padding: '3px 8px', fontSize: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={e => openEditModal(item, e)}
+                                title="Click to edit Prep Time & Details"
+                              >
+                                <span>{item.preparation_time_minutes} mins</span>
+                                <Icon name="edit" size={11} />
+                              </button>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}
+                                style={{ border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={e => handleToggleItemAvailable(item, e)}
+                                title="Click to toggle Available / Sold Out"
+                              >
+                                <span>{item.is_available ? 'Available' : 'Sold Out'}</span>
+                              </button>
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 <button
                                   className="btn-secondary"
-                                  onClick={() => openEditModal(item)}
+                                  onClick={e => openEditModal(item, e)}
                                   style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
                                 >
                                   <Icon name="edit" size={13} /> Edit
@@ -2242,7 +2977,7 @@ export default function App() {
                 <div className="card-panel">
                   <div className="card-panel-header">
                     <div>
-                      <h3>Ingredient Stock CRUD &amp; Thresholds</h3>
+                      <h3>Ingredient Stock  &amp; Thresholds</h3>
                       <p>Monitor raw ingredient levels and trigger restock operations</p>
                     </div>
                     <button className="btn-secondary" onClick={refreshAllData}>
@@ -2257,8 +2992,7 @@ export default function App() {
                           <th>Ingredient</th>
                           <th>Current Balance</th>
                           <th>Safety Level</th>
-                          <th>Status</th>
-                          <th>Restock Action</th>
+                          <th>Restock &amp; Edit Stock</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2275,21 +3009,27 @@ export default function App() {
                               </td>
                               <td>{inv.minimum_threshold} {inv.unit_of_measure}</td>
                               <td>
-                                <span className={`status-pill ${isLow ? 'cancelled' : 'ready'}`}>
-                                  {isLow ? 'Low Stock' : 'Healthy'}
-                                </span>
-                              </td>
-                              <td>
-                                <button
-                                  className="btn-secondary"
-                                  style={{ padding: '4px 10px', fontSize: '11px' }}
-                                  onClick={async () => {
-                                    await canteenApi.inventory.restock(inv.id, 25)
-                                    refreshAllData()
-                                  }}
-                                >
-                                  + Restock (+25 {inv.unit_of_measure})
-                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    className="auth-btn-primary"
+                                    style={{ width: 'auto', padding: '4px 12px', fontSize: '11px', height: '30px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    onClick={() => openEditStockModal(inv)}
+                                    title="Edit stock quantity directly"
+                                  >
+                                    <Icon name="edit" size={12} />
+                                    <span>Edit Stock</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    style={{ padding: '4px 10px', fontSize: '11px', height: '30px' }}
+                                    onClick={() => handleQuickRestock(inv, 25)}
+                                    title={`Quick restock +25 ${inv.unit_of_measure}`}
+                                  >
+                                    + Restock (+25 {inv.unit_of_measure})
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -2307,122 +3047,689 @@ export default function App() {
               =============================================================== */}
           {currentUser.role === 'stall_manager' && (
             <>
-              <div className="dashboard-header">
-                <div className="dashboard-header-text">
-                  <span className="eyebrow-chip">
-                    <span className="sparkle">✳</span> MULTI-TENANT CANTEEN STALLS
-                  </span>
-                  <h1>Mini Stall Branches (2 Active Branches)</h1>
-                  <p>Independent vendor branches with isolated catalogs, daily sales, and operational switches.</p>
-                </div>
-                <button className="btn-secondary" onClick={refreshAllData}>
-                  <Icon name="refresh" size={14} /> Sync Branches
-                </button>
-              </div>
+              {branchNavTab === 'overview' ? (
+                <>
+                  <div className="dashboard-header">
+                    <div className="dashboard-header-text">
+                      <span className="eyebrow-chip">
+                        <span className="sparkle">✳</span> MULTI-TENANT CANTEEN STALLS
+                      </span>
+                      <h1>Mini Stall Branches (2 Active Branches)</h1>
+                      <p>Independent vendor branches with isolated catalogs, daily sales, and operational switches.</p>
+                    </div>
+                    <button className="btn-secondary" onClick={refreshAllData}>
+                      <Icon name="refresh" size={14} /> Sync Branches
+                    </button>
+                  </div>
 
-              {/* 2 Branches Comparison Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '28px' }}>
-                {stalls.map(stall => {
-                  const stallItems = items.filter(i => i.stall_id === stall.id)
-                  const stallOrders = allOrders.filter(o => o.stall_id === stall.id)
-                  const stallRevenue = stallOrders
+                  {/* 2 Branches Comparison Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+                    {stalls.map(stall => {
+                      const stallItems = items.filter(i => Number(i.stall_id) === Number(stall.id))
+                      const stallOrders = allOrders.filter(o => Number(o.stall_id) === Number(stall.id))
+                      const stallRevenue = stallOrders
+                        .filter(o => o.order_status === 'Completed' || o.order_status === 'Ready for pickup')
+                        .reduce((sum, o) => sum + Number(o.total_amount), 0)
+
+                      return (
+                        <div className="card-panel" key={stall.id} style={{ margin: 0 }}>
+                          <div className="card-panel-header">
+                            <div>
+                              <span className="school-badge-mini" style={{ background: '#2563EB' }}>
+                                {stall.stall_code}
+                              </span>
+                              <h3 style={{ margin: '8px 0 2px' }}>{stall.name}</h3>
+                              <p>{stall.description}</p>
+                            </div>
+                            <button
+                              className={`status-pill ${stall.is_open ? 'ready' : 'cancelled'}`}
+                              style={{ cursor: 'pointer', border: 0 }}
+                              onClick={async () => {
+                                await canteenApi.stalls.updateStall(stall.id, { is_open: !stall.is_open })
+                                refreshAllData()
+                              }}
+                              title="Toggle branch open/close status"
+                            >
+                              {stall.is_open ? '● OPEN' : '○ CLOSED'}
+                            </button>
+                          </div>
+
+                          {/* Stall Metrics */}
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(3, 1fr)',
+                              gap: '10px',
+                              background: 'var(--bg-subtle)',
+                              padding: '12px',
+                              borderRadius: '10px',
+                              margin: '14px 0',
+                            }}
+                          >
+                            <div>
+                              <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>ITEMS</small>
+                              <strong style={{ fontSize: '15px' }}>{stallItems.length} dishes</strong>
+                            </div>
+                            <div>
+                              <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>ORDERS</small>
+                              <strong style={{ fontSize: '15px' }}>{stallOrders.length} tickets</strong>
+                            </div>
+                            <div>
+                              <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>SALES</small>
+                              <strong style={{ fontSize: '15px', color: 'var(--primary)' }}>₱{stallRevenue}.00</strong>
+                            </div>
+                          </div>
+
+                          {/* Offerings preview */}
+                          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.5px' }}>
+                              OFFERINGS AT THIS BRANCH:
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                              {stallItems.map(si => (
+                                <div
+                                  key={si.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: '#fff',
+                                    border: '1px solid var(--line)',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    whiteSpace: 'nowrap',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  <img
+                                    src={si.image_url}
+                                    alt=""
+                                    style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover' }}
+                                  />
+                                  <span>{si.name}</span>
+                                  <strong style={{ color: 'var(--primary)' }}>₱{si.price}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Staff roster for this stall */}
+                          <div style={{ marginTop: '12px', borderTop: '1px dashed var(--line)', paddingTop: '10px', fontSize: '12px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
+                              STAFF TEAM ASSIGNED ({userProfiles.filter(u => u.role === 'staff' && Number(u.stall_id || 1) === Number(stall.id)).length} USERS):
+                            </span>
+                            <span style={{ color: 'var(--ink)' }}>
+                              {userProfiles.filter(u => u.role === 'staff' && Number(u.stall_id || 1) === Number(stall.id)).map(u => u.full_name).join(', ') || 'No staff assigned yet'}
+                            </span>
+                          </div>
+
+                          {/* Direct Branch View Link */}
+                          <button
+                            type="button"
+                            className="auth-btn-primary"
+                            style={{
+                              width: '100%',
+                              marginTop: '16px',
+                              height: '38px',
+                              fontSize: '13px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                            }}
+                            onClick={() => setBranchNavTab(stall.id === 1 ? 'stall_1' : 'stall_2')}
+                          >
+                            <span>Manage {stall.name}</span>
+                            <span>&rarr;</span>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : (
+                /* SINGLE BRANCH DEDICATED OPERATIONS VIEW */
+                (() => {
+                  const activeBranchStall =
+                    (branchNavTab === 'stall_1'
+                      ? stalls.find(s => Number(s.id) === 1)
+                      : stalls.find(s => Number(s.id) === 2)) || stalls[0]
+
+                  if (!activeBranchStall) return null
+
+                  const branchItems = items.filter(i => Number(i.stall_id) === Number(activeBranchStall.id))
+                  const branchOrders = allOrders.filter(o => Number(o.stall_id) === Number(activeBranchStall.id))
+                  const branchInventory = inventoryList.filter(inv => Number(inv.stall_id) === Number(activeBranchStall.id))
+                  const branchStaff = userProfiles.filter(u => u.role === 'staff' && Number(u.stall_id || 1) === Number(activeBranchStall.id))
+                  const branchRevenue = branchOrders
                     .filter(o => o.order_status === 'Completed' || o.order_status === 'Ready for pickup')
                     .reduce((sum, o) => sum + Number(o.total_amount), 0)
+                  const branchActiveTickets = branchOrders.filter(o => o.order_status !== 'Completed' && o.order_status !== 'Cancelled')
+                  const branchLowStock = branchInventory.filter(inv => Number(inv.current_stock) <= Number(inv.minimum_threshold))
+
+                  const filteredBranchOrders = branchOrders.filter(ord => {
+                    if (branchOrderFilter === 'all') return true
+                    return ord.order_status === branchOrderFilter
+                  })
 
                   return (
-                    <div className="card-panel" key={stall.id} style={{ margin: 0 }}>
-                      <div className="card-panel-header">
-                        <div>
-                          <span className="school-badge-mini" style={{ background: '#2563EB' }}>
-                            {stall.stall_code}
-                          </span>
-                          <h3 style={{ margin: '8px 0 2px' }}>{stall.name}</h3>
-                          <p>{stall.description}</p>
+                    <div>
+                      {/* Branch Header */}
+                      <div className="dashboard-header">
+                        <div className="dashboard-header-text">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '4px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => setBranchNavTab('overview')}
+                            >
+                              <Icon name="arrow" size={12} />
+                              <span>All Branches</span>
+                            </button>
+                            <span className="school-badge-mini" style={{ background: '#2563EB', fontSize: '11px' }}>
+                              {activeBranchStall.stall_code}
+                            </span>
+                            <span className="eyebrow-chip" style={{ margin: 0 }}>
+                              BRANCH OPERATIONS
+                            </span>
+                          </div>
+                          <h1>{activeBranchStall.name}</h1>
+                          <p>{activeBranchStall.description}</p>
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className={`status-pill ${activeBranchStall.is_open ? 'ready' : 'cancelled'}`}
+                            style={{ cursor: 'pointer', border: 0, padding: '8px 18px', fontSize: '13px', fontWeight: 700 }}
+                            onClick={async () => {
+                              await canteenApi.stalls.updateStall(activeBranchStall.id, { is_open: !activeBranchStall.is_open })
+                              refreshAllData()
+                            }}
+                            title="Click to toggle branch operational status"
+                          >
+                            {activeBranchStall.is_open ? '● BRANCH OPEN' : '○ BRANCH CLOSED'}
+                          </button>
+                          <button type="button" className="btn-secondary" onClick={refreshAllData} title="Sync Branch Data">
+                            <Icon name="refresh" size={14} /> Sync Branch
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 4 Branch KPI Metrics */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '22px' }}>
+                        <div className="card-panel" style={{ margin: 0, padding: '16px' }}>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+                            Branch Sales Revenue
+                          </small>
+                          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>
+                            ₱{branchRevenue}.00
+                          </div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px' }}>
+                            {branchOrders.length} total customer tickets
+                          </small>
+                        </div>
+
+                        <div className="card-panel" style={{ margin: 0, padding: '16px' }}>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+                            Live Kitchen Queue
+                          </small>
+                          <div style={{ fontSize: '24px', fontWeight: 800, color: branchActiveTickets.length > 0 ? '#d97706' : '#15803d', marginTop: '4px' }}>
+                            {branchActiveTickets.length} active
+                          </div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px' }}>
+                            {branchOrders.filter(o => o.order_status === 'Preparing').length} cooking now
+                          </small>
+                        </div>
+
+                        <div className="card-panel" style={{ margin: 0, padding: '16px' }}>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+                            Catalog Dishes
+                          </small>
+                          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--ink)', marginTop: '4px' }}>
+                            {branchItems.length} dishes
+                          </div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px' }}>
+                            {branchItems.filter(i => i.is_available).length} available right now
+                          </small>
+                        </div>
+
+                        <div className="card-panel" style={{ margin: 0, padding: '16px' }}>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+                            Raw Stocks &amp; Staff
+                          </small>
+                          <div style={{ fontSize: '24px', fontWeight: 800, color: branchLowStock.length > 0 ? '#b91c1c' : '#15803d', marginTop: '4px' }}>
+                            {branchInventory.length} items
+                          </div>
+                          <small style={{ color: 'var(--muted)', fontSize: '11px' }}>
+                            {branchLowStock.length > 0 ? `⚠ ${branchLowStock.length} low level` : 'All safe'} &bull; {branchStaff.length} staff
+                          </small>
+                        </div>
+                      </div>
+
+                      {/* Branch Sub-Navigation Tabs */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
                         <button
-                          className={`status-pill ${stall.is_open ? 'ready' : 'cancelled'}`}
-                          style={{ cursor: 'pointer', border: 0 }}
-                          onClick={async () => {
-                            await canteenApi.stalls.updateStall(stall.id, { is_open: !stall.is_open })
-                            refreshAllData()
-                          }}
+                          type="button"
+                          className={`filter-pill-btn ${branchSubTab === 'orders' ? 'active' : ''}`}
+                          onClick={() => setBranchSubTab('orders')}
                         >
-                          {stall.is_open ? '● OPEN' : '○ CLOSED'}
+                          <Icon name="receipt" size={13} />
+                          <span>Live Queue ({branchOrders.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-pill-btn ${branchSubTab === 'menu' ? 'active' : ''}`}
+                          onClick={() => setBranchSubTab('menu')}
+                        >
+                          <Icon name="bag" size={13} />
+                          <span>Menu Catalog ({branchItems.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-pill-btn ${branchSubTab === 'inventory' ? 'active' : ''}`}
+                          onClick={() => setBranchSubTab('inventory')}
+                        >
+                          <Icon name="store" size={13} />
+                          <span>Ingredient Stocks ({branchInventory.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-pill-btn ${branchSubTab === 'staff' ? 'active' : ''}`}
+                          onClick={() => setBranchSubTab('staff')}
+                        >
+                          <Icon name="users" size={13} />
+                          <span>Staff Team ({branchStaff.length})</span>
                         </button>
                       </div>
 
-                      {/* Stall Metrics */}
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
-                          gap: '10px',
-                          background: 'var(--bg-subtle)',
-                          padding: '12px',
-                          borderRadius: '10px',
-                          margin: '14px 0',
-                        }}
-                      >
-                        <div>
-                          <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>ITEMS</small>
-                          <strong style={{ fontSize: '15px' }}>{stallItems.length} dishes</strong>
-                        </div>
-                        <div>
-                          <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>ORDERS</small>
-                          <strong style={{ fontSize: '15px' }}>{stallOrders.length} tickets</strong>
-                        </div>
-                        <div>
-                          <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block' }}>SALES</small>
-                          <strong style={{ fontSize: '15px', color: 'var(--primary)' }}>₱{stallRevenue}.00</strong>
-                        </div>
-                      </div>
-
-                      {/* Offerings preview */}
-                      <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.5px' }}>
-                          OFFERINGS AT THIS BRANCH:
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-                          {stallItems.map(si => (
-                            <div
-                              key={si.id}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                background: '#fff',
-                                border: '1px solid var(--line)',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                whiteSpace: 'nowrap',
-                                fontSize: '12px',
-                              }}
-                            >
-                              <img
-                                src={si.image_url}
-                                alt=""
-                                style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover' }}
-                              />
-                              <span>{si.name}</span>
-                              <strong style={{ color: 'var(--primary)' }}>₱{si.price}</strong>
+                      {/* SUB-TAB 1: LIVE KITCHEN QUEUE FOR THIS BRANCH */}
+                      {branchSubTab === 'orders' && (
+                        <div className="card-panel">
+                          <div className="card-panel-header">
+                            <div>
+                              <h3>Live Kitchen Queue &bull; {activeBranchStall.name}</h3>
+                              <p>Incoming customer orders isolated for this canteen branch</p>
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(['all', 'Order placed', 'Preparing', 'Ready for pickup', 'Completed'] as const).map(st => (
+                                <button
+                                  key={st}
+                                  type="button"
+                                  className={`btn-secondary ${branchOrderFilter === st ? 'active' : ''}`}
+                                  style={{
+                                    fontSize: '11px',
+                                    padding: '4px 8px',
+                                    fontWeight: branchOrderFilter === st ? 700 : 500,
+                                    borderColor: branchOrderFilter === st ? 'var(--primary)' : undefined,
+                                    color: branchOrderFilter === st ? 'var(--primary)' : undefined,
+                                  }}
+                                  onClick={() => setBranchOrderFilter(st)}
+                                >
+                                  {st === 'all' ? 'All' : st}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
 
-                      {/* Staff roster for this stall (stall handles many staff users) */}
-                      <div style={{ marginTop: '12px', borderTop: '1px dashed var(--line)', paddingTop: '10px', fontSize: '12px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
-                          STAFF TEAM ASSIGNED ({userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === stall.id).length} USERS):
-                        </span>
-                        <span style={{ color: 'var(--ink)' }}>
-                          {userProfiles.filter(u => u.role === 'staff' && (u.stall_id || 1) === stall.id).map(u => u.full_name).join(', ') || 'No staff assigned yet'}
-                        </span>
-                      </div>
+                          {filteredBranchOrders.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--muted)' }}>
+                              <Icon name="receipt" size={32} />
+                              <p style={{ marginTop: '10px' }}>No orders matching &quot;{branchOrderFilter}&quot; for {activeBranchStall.name}.</p>
+                            </div>
+                          ) : (
+                            <div className="kds-cards-grid">
+                              {filteredBranchOrders.map(ord => (
+                                <div className="kds-ticket-card" key={ord.id}>
+                                  <div>
+                                    <div className="kds-card-head">
+                                      <div>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--primary)' }}>
+                                          TICKET #{ord.id}
+                                        </span>
+                                        <strong style={{ display: 'block', fontSize: '15px', marginTop: '2px' }}>
+                                          {ord.student_name}
+                                        </strong>
+                                        <small style={{ color: 'var(--muted)' }}>ID: {ord.student_number}</small>
+                                      </div>
+                                      <span
+                                        className={`status-pill ${
+                                          ord.order_status === 'Ready for pickup'
+                                            ? 'ready'
+                                            : ord.order_status === 'Preparing'
+                                            ? 'preparing'
+                                            : ord.order_status === 'Completed'
+                                            ? 'completed'
+                                            : 'pending'
+                                        }`}
+                                      >
+                                        {ord.order_status}
+                                      </span>
+                                    </div>
+                                    <ul className="kds-items-list">
+                                      {ord.order_items?.map((oi, i) => (
+                                        <li className="kds-item-row" key={i}>
+                                          <span>{oi.item_name} &times; {oi.quantity}</span>
+                                          <strong>₱{oi.item_subtotal}.00</strong>
+                                        </li>
+                                      )) || (
+                                        <li className="kds-item-row">
+                                          <span>Order Total</span>
+                                          <strong>₱{ord.total_amount}.00</strong>
+                                        </li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                  <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
+                                      <span style={{ color: 'var(--muted)' }}>Payment: {ord.payment_method}</span>
+                                      <strong style={{ color: 'var(--primary)' }}>₱{ord.total_amount}.00</strong>
+                                    </div>
+                                    {ord.order_status === 'Order placed' && (
+                                      <button
+                                        type="button"
+                                        className="kds-btn-action"
+                                        style={{ background: 'var(--accent-amber)' }}
+                                        onClick={async () => {
+                                          await canteenApi.orders.updateStatus(ord.id, 'Preparing')
+                                          refreshAllData()
+                                        }}
+                                      >
+                                        ▶ Start Cooking
+                                      </button>
+                                    )}
+                                    {ord.order_status === 'Preparing' && (
+                                      <button
+                                        type="button"
+                                        className="kds-btn-action"
+                                        style={{ background: 'var(--primary)' }}
+                                        onClick={async () => {
+                                          await canteenApi.orders.updateStatus(ord.id, 'Ready for pickup')
+                                          refreshAllData()
+                                        }}
+                                      >
+                                        ✓ Mark Ready for Pickup
+                                      </button>
+                                    )}
+                                    {ord.order_status === 'Ready for pickup' && (
+                                      <button
+                                        type="button"
+                                        className="kds-btn-action"
+                                        style={{ background: '#16a34a', color: '#fff' }}
+                                        onClick={async () => {
+                                          await canteenApi.orders.updateStatus(ord.id, 'Completed')
+                                          refreshAllData()
+                                        }}
+                                      >
+                                        ✓ Complete Ticket
+                                      </button>
+                                    )}
+                                    {ord.order_status === 'Completed' && (
+                                      <div style={{ textAlign: 'center', fontSize: '12px', color: '#16a34a', fontWeight: 700, padding: '4px' }}>
+                                        ✓ Completed &amp; Picked Up
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 2: BRANCH MENU CATALOG */}
+                      {branchSubTab === 'menu' && (
+                        <div className="card-panel">
+                          <div className="card-panel-header">
+                            <div>
+                              <h3>Menu Catalog &bull; {activeBranchStall.name}</h3>
+                              <p>Dishes and meals prepared and served at this branch</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="auth-btn-primary"
+                              style={{ width: 'auto', padding: '0 16px', height: '36px', fontSize: '13px' }}
+                              onClick={() => openCreateModal(activeBranchStall.id)}
+                            >
+                              <Icon name="plus" size={14} /> Add Branch Dish
+                            </button>
+                          </div>
+                          <div className="data-table-wrap">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th>Dish</th>
+                                  <th>Category</th>
+                                  <th>Price</th>
+                                  <th>Prep Time</th>
+                                  <th>Status</th>
+                                  <th>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {branchItems.map(item => (
+                                  <tr key={item.id}>
+                                    <td>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <img
+                                          src={item.image_url}
+                                          alt=""
+                                          style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover' }}
+                                        />
+                                        <div>
+                                          <strong>{item.name}</strong>
+                                          <small style={{ color: 'var(--muted)', display: 'block', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {item.description}
+                                          </small>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td>
+                                      <span className="badge-tag">{item.category}</span>
+                                    </td>
+                                    <td>
+                                      <strong style={{ color: 'var(--primary)' }}>₱{item.price}.00</strong>
+                                    </td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        style={{ padding: '3px 8px', fontSize: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                        onClick={e => openEditModal(item, e)}
+                                        title="Click to edit Prep Time &amp; Details"
+                                      >
+                                        <span>{item.preparation_time_minutes} mins</span>
+                                        <Icon name="edit" size={11} />
+                                      </button>
+                                    </td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className={`status-pill ${item.is_available ? 'ready' : 'cancelled'}`}
+                                        style={{ cursor: 'pointer', border: 0 }}
+                                        onClick={async () => {
+                                          const newStatus = !item.is_available
+                                          setItems(prev => prev.map(i => (Number(i.id) === Number(item.id) ? { ...i, is_available: newStatus } : i)))
+                                          await canteenApi.menu.updateItem(item.id, { is_available: newStatus })
+                                          refreshAllData()
+                                        }}
+                                        title="Click to toggle available / sold out"
+                                      >
+                                        {item.is_available ? '● Available' : '○ Sold Out'}
+                                      </button>
+                                    </td>
+                                    <td>
+                                      <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button
+                                          type="button"
+                                          className="auth-btn-primary"
+                                          onClick={e => openEditModal(item, e)}
+                                          style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', height: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                          title="Edit full dish details"
+                                        >
+                                          <Icon name="edit" size={12} />
+                                          <span>Edit</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn-secondary"
+                                          onClick={() => handleDeleteMenuItem(item.id)}
+                                          style={{ padding: '4px 8px', fontSize: '11px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                          title="Delete menu item"
+                                        >
+                                          <Icon name="trash" size={12} />
+                                          <span>Delete</span>
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 3: RAW INGREDIENT STOCKS FOR THIS BRANCH */}
+                      {branchSubTab === 'inventory' && (
+                        <div className="card-panel">
+                          <div className="card-panel-header">
+                            <div>
+                              <h3>Ingredient Stock Levels &bull; {activeBranchStall.name}</h3>
+                              <p>Raw stock supplies tracked for this branch</p>
+                            </div>
+                            <button type="button" className="btn-secondary" onClick={refreshAllData}>
+                              <Icon name="refresh" size={14} /> Refresh Balances
+                            </button>
+                          </div>
+                          <div className="data-table-wrap">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th>ID</th>
+                                  <th>Ingredient</th>
+                                  <th>Stock Balance</th>
+                                  <th>Minimum Safe Level</th>
+                                  <th>Restock &amp; Edit Stock</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {branchInventory.map(inv => {
+                                  const isLow = Number(inv.current_stock) <= Number(inv.minimum_threshold)
+                                  return (
+                                    <tr key={inv.id}>
+                                      <td>#{inv.id}</td>
+                                      <td><strong>{inv.item_name}</strong></td>
+                                      <td>
+                                        <strong style={{ color: isLow ? '#b91c1c' : '#15803d', fontSize: '14px' }}>
+                                          {inv.current_stock} {inv.unit_of_measure}
+                                        </strong>
+                                      </td>
+                                      <td>{inv.minimum_threshold} {inv.unit_of_measure}</td>
+                                      <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                          <button
+                                            type="button"
+                                            className="auth-btn-primary"
+                                            style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', height: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                            onClick={() => openEditStockModal(inv)}
+                                            title="Edit stock quantity directly"
+                                          >
+                                            <Icon name="edit" size={12} />
+                                            <span>Edit Stock</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            style={{ padding: '4px 8px', fontSize: '11px', height: '28px' }}
+                                            onClick={() => handleQuickRestock(inv, 25)}
+                                            title={`Quick restock +25 ${inv.unit_of_measure}`}
+                                          >
+                                            + Restock (+25 {inv.unit_of_measure})
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 4: ASSIGNED STAFF TEAM */}
+                      {branchSubTab === 'staff' && (
+                        <div className="card-panel">
+                          <div className="card-panel-header">
+                            <div>
+                              <h3>Assigned Staff Team &bull; {activeBranchStall.name}</h3>
+                              <p>Kitchen and counter personnel designated to this stall branch</p>
+                            </div>
+                            <span className="nav-badge">{branchStaff.length} Staff Members</span>
+                          </div>
+
+                          {branchStaff.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--muted)' }}>
+                              <Icon name="users" size={32} />
+                              <p style={{ marginTop: '10px' }}>No staff members currently assigned to {activeBranchStall.name}.</p>
+                              <small>The Admin can assign staff members to this branch from the Team / Users dashboard.</small>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                              {branchStaff.map(staffMember => (
+                                <div
+                                  key={staffMember.id}
+                                  style={{
+                                    background: 'var(--bg-subtle)',
+                                    border: '1px solid var(--line)',
+                                    borderRadius: '10px',
+                                    padding: '14px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      width: '42px',
+                                      height: '42px',
+                                      borderRadius: '10px',
+                                      background: 'var(--primary)',
+                                      color: '#fff',
+                                      display: 'grid',
+                                      placeItems: 'center',
+                                      fontWeight: 800,
+                                      fontSize: '16px',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {staffMember.full_name?.charAt(0) || 'S'}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <strong style={{ display: 'block', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {staffMember.full_name}
+                                    </strong>
+                                    <small style={{ color: 'var(--muted)', display: 'block', fontSize: '11px' }}>
+                                      ID: {staffMember.student_id}
+                                    </small>
+                                    <small style={{ color: 'var(--muted)', display: 'block', fontSize: '11px' }}>
+                                      {staffMember.grade_or_dept || 'Kitchen Operations'}
+                                    </small>
+                                  </div>
+                                  <span className="status-pill ready" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                                    Active Staff
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
-                })}
-              </div>
+                })()
+              )}
             </>
           )}
 
@@ -3049,9 +4356,12 @@ export default function App() {
                     type="password"
                     placeholder="Enter new secure password"
                     value={newPwd}
-                    onChange={e => setNewPwd(e.target.value)}
+                    onChange={e => setNewPwd(e.target.value.replace(/\s/g, ''))}
                     required
                   />
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                    Must be at least 6 characters, mix of letters & numbers, no spaces, no repeating characters.
+                  </small>
                 </div>
 
                 <div className="crud-form-group">
@@ -3060,7 +4370,7 @@ export default function App() {
                     type="password"
                     placeholder="Confirm new password"
                     value={confirmPwd}
-                    onChange={e => setConfirmPwd(e.target.value)}
+                    onChange={e => setConfirmPwd(e.target.value.replace(/\s/g, ''))}
                     required
                   />
                 </div>
@@ -3162,7 +4472,7 @@ export default function App() {
                       <input
                         placeholder="First Name *"
                         value={newFirstName}
-                        onChange={e => setNewFirstName(e.target.value)}
+                        onChange={e => setNewFirstName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                         required
                       />
                     </div>
@@ -3170,18 +4480,21 @@ export default function App() {
                       <input
                         placeholder="Middle Name"
                         value={newMiddleName}
-                        onChange={e => setNewMiddleName(e.target.value)}
+                        onChange={e => setNewMiddleName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                       />
                     </div>
                     <div>
                       <input
                         placeholder="Last Name *"
                         value={newLastName}
-                        onChange={e => setNewLastName(e.target.value)}
+                        onChange={e => setNewLastName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                         required
                       />
                     </div>
                   </div>
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                    Letters only (no numbers or special characters allowed).
+                  </small>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -3196,11 +4509,14 @@ export default function App() {
                         : 'Admin ID'}
                     </label>
                     <input
-                      placeholder={newRole === 'student' ? 'e.g. 2025-09876' : 'e.g. EMP-2025-01'}
+                      placeholder="e.g. 202509876"
                       value={newUserId}
-                      onChange={e => setNewUserId(e.target.value)}
+                      onChange={e => setNewUserId(e.target.value.replace(/\D/g, ''))}
                       required
                     />
+                    <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                      Numbers only (unique, not all repeating digits).
+                    </small>
                   </div>
                   <div className="crud-form-group">
                     <label>Department / Grade</label>
@@ -3218,11 +4534,14 @@ export default function App() {
                     <label>Initial Password</label>
                     <input
                       type="password"
-                      placeholder="Password"
+                      placeholder="Password (min 6 chars)"
                       value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
+                      onChange={e => setNewPassword(e.target.value.replace(/\s/g, ''))}
                       required
                     />
+                    <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                      Mix letters & numbers, no spaces or repeating characters.
+                    </small>
                   </div>
                   <div className="crud-form-group">
                     <label>Initial Balance (₱)</label>
@@ -3379,11 +4698,11 @@ export default function App() {
                     type="password"
                     placeholder="e.g. newpassword123"
                     value={adminResetNewPwd}
-                    onChange={e => setAdminResetNewPwd(e.target.value)}
+                    onChange={e => setAdminResetNewPwd(e.target.value.replace(/\s/g, ''))}
                     required
                   />
                   <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                    The user will use this new password immediately upon their next log in.
+                    Mix letters & numbers, min 6 characters, no spaces or repeating digits.
                   </small>
                 </div>
               </div>
@@ -3402,6 +4721,536 @@ export default function App() {
                   style={{ width: 'auto', padding: '0 20px', height: '40px', fontSize: '13px' }}
                 >
                   Save New Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL: ADMIN EDIT USER DETAILS (CHANGE NAME & ID NUMBER)
+          =============================================================== */}
+      {adminEditUser && (
+        <div className="crud-modal-overlay" onMouseDown={() => setAdminEditUser(null)}>
+          <div className="crud-modal" style={{ maxWidth: '620px', width: 'min(620px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div>
+                <span className="sidebar-section-kicker" style={{ margin: 0, color: 'var(--primary)', paddingLeft: 0 }}>ADMINISTRATION PORTAL</span>
+                <h3 style={{ margin: '2px 0 0', fontSize: '20px', fontFamily: 'var(--font-serif)' }}>
+                  Edit User Details & ID Number
+                </h3>
+                <small style={{ color: 'var(--muted)' }}>
+                  Modifying user profile for {adminEditUser.full_name} ({adminEditUser.student_id})
+                </small>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setAdminEditUser(null)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditUser}>
+              <div className="crud-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                {editError && <div className="toast-error">{editError}</div>}
+                {editSuccess && <div className="toast-success">{editSuccess}</div>}
+
+                {/* Role Selector Tabs */}
+                <div className="crud-form-group">
+                  <label>Account Role Tier</label>
+                  <div className="modal-role-selector">
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${editRole === 'stall_manager' ? 'active' : ''}`}
+                      onClick={() => setEditRole('stall_manager')}
+                    >
+                      Stall Account
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${editRole === 'admin' ? 'active' : ''}`}
+                      onClick={() => setEditRole('admin')}
+                    >
+                      Admin User
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${editRole === 'staff' ? 'active' : ''}`}
+                      onClick={() => setEditRole('staff')}
+                    >
+                      Staff Member
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-role-btn ${editRole === 'student' ? 'active' : ''}`}
+                      onClick={() => setEditRole('student')}
+                    >
+                      Customer (Student)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Name Breakdown: First Name, Middle Name, Last Name */}
+                <div className="crud-form-group">
+                  <label>Full Legal Name (First, Middle, Last)</label>
+                  <div className="name-inputs-row">
+                    <div>
+                      <input
+                        placeholder="First Name *"
+                        value={editFirstName}
+                        onChange={e => setEditFirstName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <input
+                        placeholder="Middle Name"
+                        value={editMiddleName}
+                        onChange={e => setEditMiddleName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        placeholder="Last Name *"
+                        value={editLastName}
+                        onChange={e => setEditLastName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                    Letters only. Formatted display name: <strong>{`${editFirstName.trim()} ${editMiddleName.trim() ? editMiddleName.trim() + ' ' : ''}${editLastName.trim()}`.trim() || '—'}</strong>
+                  </small>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="crud-form-group">
+                    <label>
+                      {editRole === 'student'
+                        ? 'Student ID Number *'
+                        : editRole === 'staff'
+                        ? 'Staff Employee ID *'
+                        : editRole === 'stall_manager'
+                        ? 'Stall Manager ID *'
+                        : 'Admin ID *'}
+                    </label>
+                    <input
+                      placeholder="e.g. 202501234 or 10025"
+                      value={editStudentId}
+                      onChange={e => setEditStudentId(e.target.value.replace(/\D/g, ''))}
+                      required
+                    />
+                    <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                      Numbers only (unique, not all repeating digits).
+                    </small>
+                  </div>
+                  <div className="crud-form-group">
+                    <label>Department / Grade</label>
+                    <input
+                      placeholder="e.g. Grade 12 - STEM / Kitchen Ops"
+                      value={editDept}
+                      onChange={e => setEditDept(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="crud-form-group">
+                    <label>Wallet Balance (₱)</label>
+                    <input
+                      type="number"
+                      value={editBalance}
+                      onChange={e => setEditBalance(Number(e.target.value))}
+                    />
+                  </div>
+                  {(editRole === 'staff' || editRole === 'stall_manager') && (
+                    <div className="crud-form-group">
+                      <label>Assigned Canteen Stall</label>
+                      <select
+                        value={editStallId}
+                        onChange={e => setEditStallId(Number(e.target.value))}
+                      >
+                        {stalls.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.stall_code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="crud-modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setAdminEditUser(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="auth-btn-primary"
+                  type="submit"
+                  style={{ width: 'auto', padding: '0 24px', height: '40px', fontSize: '13px' }}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL 4: CAMPUS DIRECTORY & SCHOOL SWITCHER
+          =============================================================== */}
+      {schoolModalOpen && (
+        <div className="crud-modal-overlay" onMouseDown={() => setSchoolModalOpen(false)}>
+          <div className="crud-modal" style={{ maxWidth: '560px', width: 'min(560px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="school-badge-square" style={{ width: '40px', height: '40px', fontSize: '13px' }}>
+                  {activeCampus.abbr}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontFamily: 'var(--font-serif)' }}>Campus & Canteen Directory</h3>
+                  <small style={{ color: 'var(--muted)' }}>Select or view active Holy Name University branch</small>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setSchoolModalOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <div className="crud-modal-body">
+              <span className="sidebar-section-kicker" style={{ margin: 0, paddingLeft: 0 }}>AVAILABLE UNIVERSITY CAMPUSES</span>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {campuses.map(c => (
+                  <div
+                    key={c.id}
+                    className={`campus-option-card ${c.active ? 'active' : ''}`}
+                    onClick={() => {
+                      setCampuses(prev => prev.map(item => ({ ...item, active: item.id === c.id })))
+                      setSyncToast(`✓ Switched campus to ${c.name}`)
+                      setTimeout(() => setSyncToast(''), 2500)
+                      setTimeout(() => setSchoolModalOpen(false), 300)
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="school-badge-square" style={{ width: '42px', height: '42px', fontSize: '12px' }}>
+                        {c.abbr}
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: '14px', color: 'var(--ink)', display: 'block' }}>{c.name}</strong>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)', display: 'block' }}>{c.campusLocation}</span>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '11px', color: 'var(--ink-secondary)' }}>
+                          <span>🕒 {c.hours}</span>
+                          <span>🏬 {c.stallsCount} Food Stalls</span>
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>[{c.code}]</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      {c.active ? (
+                        <span className="status-pill ready" style={{ fontSize: '11px' }}>Active</span>
+                      ) : (
+                        <button type="button" className="btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                          Select
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ background: 'var(--bg-subtle)', padding: '12px 14px', borderRadius: '8px', fontSize: '12px', color: 'var(--muted)', marginTop: '8px' }}>
+                💡 <strong>Canteen System Note:</strong> Orders and inventory synchronize seamlessly across campus branches via PostgreSQL 15 Supabase backend.
+              </div>
+            </div>
+
+            <div className="crud-modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setSchoolModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL 5: USER PROFILE & WALLET TOP-UP MODAL
+          =============================================================== */}
+      {userProfileModalOpen && (
+        <div className="crud-modal-overlay" onMouseDown={() => setUserProfileModalOpen(false)}>
+          <div className="crud-modal" style={{ maxWidth: '480px', width: 'min(480px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  className="user-avatar-circle"
+                  style={{ width: '42px', height: '42px', fontSize: '18px', background: 'var(--primary)', color: '#FFFFFF' }}
+                >
+                  {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontFamily: 'var(--font-serif)' }}>{currentUser.full_name}</h3>
+                  <small style={{ color: 'var(--muted)', textTransform: 'capitalize' }}>
+                    {currentUser.role.replace('_', ' ')} &bull; {currentUser.student_id}
+                  </small>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setUserProfileModalOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <div className="crud-modal-body">
+              {topUpSuccess && <div className="toast-success">{topUpSuccess}</div>}
+
+              {/* Account Meta Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'var(--bg-subtle)', padding: '14px', borderRadius: '10px', fontSize: '12px' }}>
+                <div>
+                  <span style={{ color: 'var(--muted)', display: 'block', fontSize: '11px', fontWeight: 700 }}>STUDENT / USER ID</span>
+                  <strong style={{ fontSize: '13px' }}>{currentUser.student_id}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--muted)', display: 'block', fontSize: '11px', fontWeight: 700 }}>DEPARTMENT / SECTION</span>
+                  <strong style={{ fontSize: '13px' }}>{currentUser.grade_or_dept || 'General'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--muted)', display: 'block', fontSize: '11px', fontWeight: 700 }}>ACCOUNT ROLE</span>
+                  <span className="status-pill preparing" style={{ textTransform: 'capitalize', marginTop: '2px', display: 'inline-block' }}>
+                    {currentUser.role.replace('_', ' ')}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--muted)', display: 'block', fontSize: '11px', fontWeight: 700 }}>CAMPUS AFFILIATION</span>
+                  <strong style={{ fontSize: '13px' }}>{activeCampus.name}</strong>
+                </div>
+              </div>
+
+              {/* Wallet Balance Card & Quick Top-Up */}
+              <div style={{ border: '1.5px solid var(--line)', borderRadius: '12px', padding: '16px', background: '#FAFBF9' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.6px' }}>CANTEEN WALLET BALANCE</span>
+                    <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-serif)', marginTop: '2px' }}>
+                      ₱{currentUser.balance.toFixed(2)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span className="count-badge ready" style={{ fontSize: '11px', padding: '4px 8px' }}>Active Balance</span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '14px', borderTop: '1px dashed var(--line)', paddingTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--ink-secondary)' }}>
+                    Quick Balance Reload / Top-up:
+                  </span>
+                  <div className="quick-topup-grid">
+                    <button type="button" className="quick-topup-btn" onClick={() => handleTopUpBalance(50)}>
+                      +₱50
+                    </button>
+                    <button type="button" className="quick-topup-btn" onClick={() => handleTopUpBalance(100)}>
+                      +₱100
+                    </button>
+                    <button type="button" className="quick-topup-btn" onClick={() => handleTopUpBalance(200)}>
+                      +₱200
+                    </button>
+                    <button type="button" className="quick-topup-btn" onClick={() => handleTopUpBalance(500)}>
+                      +₱500
+                    </button>
+                  </div>
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+                    Clicking instantly reloads balance for testing cashless canteen counter orders.
+                  </small>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  onClick={() => {
+                    setUserProfileModalOpen(false)
+                    setChangePasswordModalOpen(true)
+                  }}
+                >
+                  <Icon name="key" size={14} />
+                  <span>Change Password</span>
+                </button>
+                <button
+                  type="button"
+                  className="sidebar-signout-btn"
+                  style={{ flex: 1, padding: '10px', fontSize: '12px' }}
+                  onClick={() => {
+                    setUserProfileModalOpen(false)
+                    handleLogout()
+                  }}
+                >
+                  <Icon name="logout" size={14} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="crud-modal-footer">
+              <button
+                type="button"
+                className="auth-btn-primary"
+                style={{ width: 'auto', padding: '0 20px', height: '38px', fontSize: '13px' }}
+                onClick={() => setUserProfileModalOpen(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===============================================================
+          MODAL 6: INVENTORY STOCK EDIT & RESTOCK MODAL
+          =============================================================== */}
+      {stockModalOpen && editingStockItem && (
+        <div className="crud-modal-overlay" onMouseDown={() => setStockModalOpen(false)}>
+          <div className="crud-modal" style={{ maxWidth: '480px', width: 'min(480px, 100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="crud-modal-header">
+              <div>
+                <span className="sidebar-section-kicker" style={{ margin: 0, color: 'var(--primary)', paddingLeft: 0 }}>
+                  INVENTORY MANAGEMENT
+                </span>
+                <h3 style={{ margin: '2px 0 0', fontSize: '20px', fontFamily: 'var(--font-serif)' }}>
+                  Edit Stock &amp; Restock
+                </h3>
+                <small style={{ color: 'var(--muted)' }}>
+                  {editingStockItem.item_name} &bull; Stored in {editingStockItem.unit_of_measure}
+                </small>
+              </div>
+              <button
+                type="button"
+                className="icon-action-btn"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setStockModalOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStock}>
+              <div className="crud-modal-body">
+                {stockModalToast && <div className="toast-success">{stockModalToast}</div>}
+
+                <div style={{ background: 'var(--bg-subtle)', padding: '12px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: 'var(--muted)' }}>Ingredient:</span>
+                    <strong>{editingStockItem.item_name}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: 'var(--muted)' }}>Branch:</span>
+                    <span>{stalls.find(s => s.id === editingStockItem.stall_id)?.name || 'Main Kitchen'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--muted)' }}>Recorded Balance:</span>
+                    <strong style={{ color: 'var(--primary)' }}>
+                      {editingStockItem.current_stock} {editingStockItem.unit_of_measure}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="crud-form-group">
+                  <label>Current Stock Balance ({editingStockItem.unit_of_measure}) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={stockFormQty}
+                    onChange={e => setStockFormQty(e.target.value)}
+                    required
+                    style={{ fontSize: '16px', fontWeight: 700 }}
+                  />
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                    Edit directly to the exact count on hand.
+                  </small>
+                </div>
+
+                {/* Quick Add / Restock Shortcuts */}
+                <div className="crud-form-group">
+                  <label>Quick Restock Additions</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[5, 10, 25, 50, 100].map(addVal => (
+                      <button
+                        key={addVal}
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 700 }}
+                        onClick={() => setStockFormQty(prev => Math.max(0, (parseFloat(String(prev)) || 0) + addVal))}
+                      >
+                        +{addVal} {editingStockItem.unit_of_measure}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ padding: '6px 10px', fontSize: '12px', color: '#b91c1c' }}
+                      onClick={() => setStockFormQty(0)}
+                    >
+                      Clear to 0
+                    </button>
+                  </div>
+                </div>
+
+                <div className="crud-form-group">
+                  <label>Minimum Safe Threshold ({editingStockItem.unit_of_measure})</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={stockFormMin}
+                    onChange={e => setStockFormMin(e.target.value)}
+                    required
+                  />
+                  <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
+                    Alert threshold when stock runs low.
+                  </small>
+                </div>
+              </div>
+
+              <div className="crud-modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setStockModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="auth-btn-primary"
+                  type="submit"
+                  style={{ width: 'auto', padding: '0 24px', height: '40px', fontSize: '13px' }}
+                >
+                  Save Stock Updates
                 </button>
               </div>
             </form>

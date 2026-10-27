@@ -117,6 +117,60 @@ export interface AuditLog {
   created_at: string
 }
 
+// Recipe mappings linking menu items to raw inventory ingredients
+// Defines which raw stock items and how many units are deducted upon customer purchase
+export const MENU_RECIPES: Record<number, Array<{ invId: number; qty: number }>> = {
+  1: [ // Chicken Adobo Bowl: 1 serving chicken cuts, 1 serving rice
+    { invId: 1, qty: 1 },
+    { invId: 2, qty: 1 },
+  ],
+  2: [ // Crispy Fried Chicken: 1 serving chicken cuts, 1 serving rice
+    { invId: 1, qty: 1 },
+    { invId: 2, qty: 1 },
+  ],
+  3: [ // Fresh Veggie Rice Bowl: 1 serving rice
+    { invId: 2, qty: 1 },
+  ],
+  4: [ // Beef Tapa Silog: 1 serving beef tapa, 1 fresh egg, 1 serving rice
+    { invId: 3, qty: 1 },
+    { invId: 4, qty: 1 },
+    { invId: 2, qty: 1 },
+  ],
+  5: [ // Classic Pork Siomai: 4 pieces siomai per order
+    { invId: 5, qty: 4 },
+  ],
+  6: [ // Chilled Calamansi Juice: 1 serving calamansi puree
+    { invId: 6, qty: 1 },
+  ],
+}
+
+export function deductInventoryStock(
+  currentInventory: InventoryItem[],
+  orderItems: Array<{ menu_item_id: number; quantity: number }>
+): { updatedInventory: InventoryItem[]; deductions: Record<number, number> } {
+  const deductions: Record<number, number> = {}
+  for (const oi of orderItems) {
+    const recipe = MENU_RECIPES[Number(oi.menu_item_id)] || [
+      { invId: Number(oi.menu_item_id), qty: 1 },
+    ]
+    for (const ing of recipe) {
+      deductions[ing.invId] = (deductions[ing.invId] || 0) + ing.qty * oi.quantity
+    }
+  }
+
+  const updatedInventory = currentInventory.map(inv => {
+    const numId = Number(inv.id)
+    const deduct = deductions[numId] || 0
+    if (deduct > 0) {
+      const newStock = Math.max(0, Number(inv.current_stock) - deduct)
+      return { ...inv, current_stock: newStock }
+    }
+    return inv
+  })
+
+  return { updatedInventory, deductions }
+}
+
 const headers = {
   apikey: SUPABASE_ANON_KEY,
   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -320,15 +374,46 @@ export const supabase = {
   // 2. STALLS & MINI STALL BRANCHES
   // ==========================================
   async getStalls(): Promise<Stall[]> {
+    let remoteData: Stall[] = []
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/stalls?select=*&order=id.asc`, { headers })
       if (res.ok) {
         const data = await res.json()
-        if (data && data.length > 0) return data
+        if (Array.isArray(data) && data.length > 0) {
+          remoteData = data.map((s: any) => ({
+            ...s,
+            id: Number(s.id),
+            is_open: s.is_open ?? true,
+          }))
+        }
       }
     } catch {}
 
-    return [
+    const saved = localStorage.getItem('smartbite_stalls')
+    let localList: Stall[] = []
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) localList = parsed
+      } catch {}
+    }
+
+    if (remoteData.length > 0) {
+      const merged = remoteData.map(rem => {
+        const loc = localList.find(l => Number(l.id) === Number(rem.id))
+        return loc ? { ...rem, ...loc } : rem
+      })
+      for (const loc of localList) {
+        if (!merged.some(m => Number(m.id) === Number(loc.id))) {
+          merged.push(loc)
+        }
+      }
+      return merged
+    }
+
+    if (localList.length > 0) return localList
+
+    const initialStalls: Stall[] = [
       {
         id: 1,
         name: 'SmartBite Main Kitchen',
@@ -346,11 +431,26 @@ export const supabase = {
         rating: 4.8,
       },
     ]
+    try {
+      localStorage.setItem('smartbite_stalls', JSON.stringify(initialStalls))
+    } catch {}
+    return initialStalls
   },
 
   async updateStall(id: number, updates: Partial<Stall>): Promise<void> {
+    const numId = Number(id)
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/stalls?id=eq.${id}`, {
+      const saved = localStorage.getItem('smartbite_stalls')
+      let stalls: Stall[] = saved ? JSON.parse(saved) : []
+      if (!Array.isArray(stalls) || stalls.length === 0) {
+        stalls = await this.getStalls()
+      }
+      const updated = stalls.map(s => (Number(s.id) === numId ? { ...s, ...updates } : s))
+      localStorage.setItem('smartbite_stalls', JSON.stringify(updated))
+    } catch {}
+
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/stalls?id=eq.${numId}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify(updates),
@@ -358,12 +458,6 @@ export const supabase = {
     } catch (err) {
       console.error('updateStall error:', err)
     }
-
-    try {
-      const stalls = await this.getStalls()
-      const updated = stalls.map(s => (s.id === id ? { ...s, ...updates } : s))
-      localStorage.setItem('smartbite_stalls', JSON.stringify(updated))
-    } catch {}
   },
 
   async createStall(stall: Omit<Stall, 'id'>): Promise<Stall> {
@@ -400,6 +494,7 @@ export const supabase = {
   // 3. MENU ITEMS CRUD (Staff Full CRUD)
   // ==========================================
   async getMenuItems(stallId?: number): Promise<MenuItem[]> {
+    let remoteData: MenuItem[] = []
     try {
       const filter = stallId ? `&stall_id=eq.${stallId}` : ''
       const res = await fetch(
@@ -408,23 +503,60 @@ export const supabase = {
       )
       if (res.ok) {
         const data = await res.json()
-        return data.map((item: any) => ({
-          ...item,
-          category: item.category?.name || item.category || 'General',
-        }))
+        if (Array.isArray(data) && data.length > 0) {
+          remoteData = data.map((item: any) => ({
+            ...item,
+            id: Number(item.id),
+            stall_id: Number(item.stall_id),
+            price: Number(item.price),
+            preparation_time_minutes: Number(item.preparation_time_minutes),
+            is_available: item.is_available ?? item.available ?? true,
+            category: item.category?.name || item.category || 'General',
+          }))
+        }
       }
     } catch (err) {
       console.warn('getMenuItems notice:', err)
     }
 
     const saved = localStorage.getItem('smartbite_menu_items')
+    let localList: MenuItem[] = []
     if (saved) {
       try {
-        const all: MenuItem[] = JSON.parse(saved)
-        return stallId ? all.filter(i => i.stall_id === stallId) : all
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) localList = parsed
       } catch {}
     }
-    return []
+
+    if (remoteData.length > 0) {
+      const merged = remoteData.map(rem => {
+        const loc = localList.find(l => Number(l.id) === Number(rem.id))
+        return loc ? { ...rem, ...loc } : rem
+      })
+      for (const loc of localList) {
+        if (!merged.some(m => Number(m.id) === Number(loc.id))) {
+          merged.push(loc)
+        }
+      }
+      return stallId ? merged.filter(i => Number(i.stall_id) === Number(stallId)) : merged
+    }
+
+    if (localList.length > 0) {
+      return stallId ? localList.filter(i => Number(i.stall_id) === Number(stallId)) : localList
+    }
+
+    const initialItems: MenuItem[] = [
+      { id: 1, stall_id: 1, category_id: 1, category: 'Rice Meals', name: 'Chicken Adobo Bowl', description: 'Tender chicken braised in garlic-soy vinegar with jasmine rice', price: 75.00, preparation_time_minutes: 8, rating: '4.9', image_url: 'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85', is_available: true },
+      { id: 2, stall_id: 1, category_id: 1, category: 'Rice Meals', name: 'Crispy Fried Chicken', description: 'Golden spiced chicken thigh with savory gravy and garlic rice', price: 85.00, preparation_time_minutes: 10, rating: '4.8', image_url: 'https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85', is_available: true },
+      { id: 3, stall_id: 1, category_id: 1, category: 'Rice Meals', name: 'Fresh Veggie Rice Bowl', description: 'Wok-tossed market vegetables, fried tofu, and seasoned garlic rice', price: 65.00, preparation_time_minutes: 7, rating: '4.7', image_url: 'https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85', is_available: true },
+      { id: 4, stall_id: 1, category_id: 2, category: 'Breakfast', name: 'Beef Tapa Silog', description: 'Marinated cured beef sirloin with sunny fried egg and garlic rice', price: 80.00, preparation_time_minutes: 9, rating: '4.8', image_url: 'https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85', is_available: true },
+      { id: 5, stall_id: 2, category_id: 3, category: 'Snacks', name: 'Classic Pork Siomai', description: 'Four steamed pork-shrimp dumplings with garlic chili oil', price: 45.00, preparation_time_minutes: 5, rating: '4.9', image_url: 'https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85', is_available: true },
+      { id: 6, stall_id: 2, category_id: 4, category: 'Drinks', name: 'Chilled Calamansi Juice', description: 'Freshly extracted native lime, honey, and crushed iced water', price: 30.00, preparation_time_minutes: 3, rating: '4.6', image_url: 'https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85', is_available: true },
+    ]
+    try {
+      localStorage.setItem('smartbite_menu_items', JSON.stringify(initialItems))
+    } catch {}
+    return stallId ? initialItems.filter(i => Number(i.stall_id) === Number(stallId)) : initialItems
   },
 
   async createMenuItem(item: Omit<MenuItem, 'id'>): Promise<MenuItem> {
@@ -455,29 +587,42 @@ export const supabase = {
   },
 
   async updateMenuItem(id: number, updates: Partial<MenuItem>): Promise<void> {
+    const numId = Number(id)
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/menu_items?id=eq.${id}`, {
+      const payload: any = { ...updates }
+      if (typeof updates.is_available === 'boolean') {
+        payload.is_available = updates.is_available
+        payload.available = updates.is_available
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/menu_items?id=eq.${numId}`, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify(updates),
+        body: JSON.stringify(payload),
       })
-    } catch {}
+    } catch (err) {
+      console.warn('updateMenuItem fetch notice:', err)
+    }
 
-    const all = await this.getMenuItems()
-    const updated = all.map(i => (i.id === id ? { ...i, ...updates } : i))
-    localStorage.setItem('smartbite_menu_items', JSON.stringify(updated))
+    try {
+      const all = await this.getMenuItems()
+      const updated = all.map(i => (Number(i.id) === numId ? { ...i, ...updates } : i))
+      localStorage.setItem('smartbite_menu_items', JSON.stringify(updated))
+    } catch (err) {
+      console.warn('updateMenuItem local storage notice:', err)
+    }
   },
 
   async deleteMenuItem(id: number): Promise<void> {
+    const numId = Number(id)
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/menu_items?id=eq.${id}`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/menu_items?id=eq.${numId}`, {
         method: 'DELETE',
         headers,
       })
     } catch {}
 
     const all = await this.getMenuItems()
-    const updated = all.filter(i => i.id !== id)
+    const updated = all.filter(i => Number(i.id) !== numId)
     localStorage.setItem('smartbite_menu_items', JSON.stringify(updated))
   },
 
@@ -485,6 +630,7 @@ export const supabase = {
   // 4. INVENTORY ITEMS CRUD (Staff Full CRUD)
   // ==========================================
   async getInventory(stallId?: number): Promise<InventoryItem[]> {
+    let remoteData: InventoryItem[] = []
     try {
       const filter = stallId ? `&stall_id=eq.${stallId}` : ''
       const res = await fetch(
@@ -493,19 +639,57 @@ export const supabase = {
       )
       if (res.ok) {
         const data = await res.json()
-        if (data && data.length > 0) return data
+        if (Array.isArray(data) && data.length > 0) {
+          remoteData = data.map((item: any) => ({
+            id: Number(item.id),
+            stall_id: Number(item.stall_id),
+            item_name: item.item_name,
+            unit_of_measure: item.unit_of_measure,
+            current_stock: Number(item.current_stock),
+            minimum_threshold: Number(item.minimum_threshold),
+            reorder_quantity: Number(item.reorder_quantity || 50),
+            last_restocked_at: item.last_restocked_at,
+          }))
+        }
       }
     } catch {}
 
+    // Merge with locally persisted edits in localStorage so user edits never revert
     const saved = localStorage.getItem('smartbite_inventory')
+    let localList: InventoryItem[] = []
     if (saved) {
       try {
-        const all: InventoryItem[] = JSON.parse(saved)
-        return stallId ? all.filter(i => i.stall_id === stallId) : all
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) localList = parsed
       } catch {}
     }
 
-    return [
+    if (remoteData.length > 0) {
+      const merged = remoteData.map(rem => {
+        const loc = localList.find(l => Number(l.id) === Number(rem.id))
+        return loc
+          ? {
+              ...rem,
+              current_stock: Number(loc.current_stock),
+              minimum_threshold: Number(loc.minimum_threshold),
+              item_name: loc.item_name || rem.item_name,
+              unit_of_measure: loc.unit_of_measure || rem.unit_of_measure,
+            }
+          : rem
+      })
+      for (const loc of localList) {
+        if (!merged.some(m => Number(m.id) === Number(loc.id))) {
+          merged.push(loc)
+        }
+      }
+      return stallId ? merged.filter(i => Number(i.stall_id) === Number(stallId)) : merged
+    }
+
+    if (localList.length > 0) {
+      return stallId ? localList.filter(i => Number(i.stall_id) === Number(stallId)) : localList
+    }
+
+    const initial: InventoryItem[] = [
       { id: 1, stall_id: 1, item_name: 'Marinated Chicken Cuts', unit_of_measure: 'kg', current_stock: 45, minimum_threshold: 10, reorder_quantity: 50 },
       { id: 2, stall_id: 1, item_name: 'Jasmine Steamed Rice', unit_of_measure: 'kg', current_stock: 80, minimum_threshold: 15, reorder_quantity: 100 },
       { id: 3, stall_id: 1, item_name: 'Beef Tapa Cuts', unit_of_measure: 'kg', current_stock: 30, minimum_threshold: 8, reorder_quantity: 40 },
@@ -513,6 +697,10 @@ export const supabase = {
       { id: 5, stall_id: 2, item_name: 'Pork Siomai Pack', unit_of_measure: 'pieces', current_stock: 200, minimum_threshold: 40, reorder_quantity: 250 },
       { id: 6, stall_id: 2, item_name: 'Fresh Calamansi Puree', unit_of_measure: 'liters', current_stock: 25, minimum_threshold: 5, reorder_quantity: 30 },
     ]
+    try {
+      localStorage.setItem('smartbite_inventory', JSON.stringify(initial))
+    } catch {}
+    return stallId ? initial.filter(i => Number(i.stall_id) === Number(stallId)) : initial
   },
 
   async createInventoryItem(item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> {
@@ -535,32 +723,66 @@ export const supabase = {
   },
 
   async updateInventoryItem(id: number, updates: Partial<InventoryItem>): Promise<void> {
+    const numId = Number(id)
+    // 1. Immediately update localStorage so edit persists reliably
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/inventory_items?id=eq.${id}`, {
+      const saved = localStorage.getItem('smartbite_inventory')
+      let list: InventoryItem[] = saved ? JSON.parse(saved) : []
+      if (!Array.isArray(list) || list.length === 0) {
+        list = await this.getInventory()
+      }
+      const updated = list.map(i => (Number(i.id) === numId ? { ...i, ...updates } : i))
+      localStorage.setItem('smartbite_inventory', JSON.stringify(updated))
+    } catch (err) {
+      console.warn('updateInventoryItem local error:', err)
+    }
+
+    // 2. Also try PATCHing remote Supabase
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/inventory_items?id=eq.${numId}`, {
         method: 'PATCH',
-        headers,
+        headers: { ...headers, Prefer: 'return=representation' },
         body: JSON.stringify(updates),
       })
     } catch {}
-
-    const all = await this.getInventory()
-    const updated = all.map(i => (i.id === id ? { ...i, ...updates } : i))
-    localStorage.setItem('smartbite_inventory', JSON.stringify(updated))
   },
 
   async restockInventory(inventoryId: number, quantityAdded: number): Promise<any> {
+    const numId = Number(inventoryId)
+    let newStock = quantityAdded
+    // 1. Immediately update localStorage so restock persists reliably
     try {
-      const rpc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/sp_restock_inventory`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ p_inventory_id: inventoryId, p_quantity_added: quantityAdded }),
+      const saved = localStorage.getItem('smartbite_inventory')
+      let list: InventoryItem[] = saved ? JSON.parse(saved) : []
+      if (!Array.isArray(list) || list.length === 0) {
+        list = await this.getInventory()
+      }
+      const target = list.find(i => Number(i.id) === numId)
+      newStock = target ? Math.max(0, Number(target.current_stock) + quantityAdded) : quantityAdded
+      const updated = list.map(i => (Number(i.id) === numId ? { ...i, current_stock: newStock } : i))
+      localStorage.setItem('smartbite_inventory', JSON.stringify(updated))
+    } catch (err) {
+      console.warn('restockInventory local error:', err)
+    }
+
+    // 2. Also try patching Supabase and RPC
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/inventory_items?id=eq.${numId}`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=representation' },
+        body: JSON.stringify({ current_stock: newStock }),
       })
-      if (rpc.ok) return await rpc.json()
     } catch {}
 
-    const all = await this.getInventory()
-    const updated = all.map(i => (i.id === inventoryId ? { ...i, current_stock: Number(i.current_stock) + quantityAdded } : i))
-    localStorage.setItem('smartbite_inventory', JSON.stringify(updated))
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/sp_restock_inventory`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ p_inventory_id: numId, p_quantity_added: quantityAdded }),
+      })
+    } catch {}
+
+    return { ok: true, current_stock: newStock }
   },
 
   // ==========================================
@@ -582,6 +804,32 @@ export const supabase = {
       special_instructions?: string
     }>
   ): Promise<any> {
+    // 1. Deduct ingredient stock in inventory immediately
+    try {
+      const savedInv = localStorage.getItem('smartbite_inventory')
+      let invList: InventoryItem[] = savedInv ? JSON.parse(savedInv) : []
+      if (!Array.isArray(invList) || invList.length === 0) {
+        invList = await this.getInventory()
+      }
+      const { updatedInventory, deductions } = deductInventoryStock(invList, items)
+      localStorage.setItem('smartbite_inventory', JSON.stringify(updatedInventory))
+
+      // Patch remote Supabase for each deducted item in the background
+      for (const [invIdStr, deductQty] of Object.entries(deductions)) {
+        const invId = Number(invIdStr)
+        const updatedItem = updatedInventory.find(i => Number(i.id) === invId)
+        if (updatedItem && deductQty > 0) {
+          fetch(`${SUPABASE_URL}/rest/v1/inventory_items?id=eq.${invId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ current_stock: updatedItem.current_stock }),
+          }).catch(() => {})
+        }
+      }
+    } catch (err) {
+      console.warn('placeOrder stock deduction notice:', err)
+    }
+
     try {
       const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/sp_place_canteen_order`, {
         method: 'POST',

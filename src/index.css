@@ -498,10 +498,15 @@ a {
   align-items: center;
   gap: 10px;
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s ease;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  user-select: none;
 }
 .sidebar-school-card:hover {
-  border-color: var(--line-strong);
+  border-color: var(--primary);
+  background: #FAFBF9;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 .school-badge-square {
   width: 36px;
@@ -600,6 +605,16 @@ a {
   padding: 8px 10px;
   background: var(--bg-subtle);
   border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+.sidebar-user-chip:hover {
+  background: #FFFFFF;
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 .user-avatar-circle {
   width: 32px;
@@ -1865,4 +1880,174 @@ a {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 14px;
+}
+
+/* ==========================================================================
+   INTERACTIVE NOTIFICATIONS, SYNC FEEDBACK & WALLET TOP-UP STYLES
+   ========================================================================== */
+.notification-count-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+}
+
+@keyframes spinRefresh {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.icon-action-btn.spinning svg {
+  animation: spinRefresh 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.floating-sync-toast {
+  position: fixed;
+  top: 76px;
+  right: 32px;
+  z-index: 1000;
+  background: #1B2A22;
+  color: #FFFFFF;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeInDown 0.2s ease-out;
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.notifications-dropdown {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 360px;
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+  z-index: 250;
+  overflow: hidden;
+  animation: fadeInDown 0.18s ease-out;
+}
+.notifications-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FAFBF9;
+}
+.notifications-list {
+  max-height: 330px;
+  overflow-y: auto;
+}
+.notification-item-card {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.notification-item-card:hover {
+  background: var(--bg-subtle);
+}
+.notification-item-card.unread {
+  background: #F0FDF4;
+}
+.notification-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.notification-item-icon.order {
+  background: #DCFCE7;
+  color: #15803D;
+}
+.notification-item-icon.balance {
+  background: #E0E7FF;
+  color: #3730A3;
+}
+.notification-item-icon.announcement {
+  background: #FEF3C7;
+  color: #92400E;
+}
+.notifications-footer {
+  padding: 10px 18px;
+  background: #FAFBF9;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Campus directory selector */
+.campus-option-card {
+  background: #FFFFFF;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.campus-option-card:hover {
+  border-color: var(--primary);
+  background: #FAFBF9;
+}
+.campus-option-card.active {
+  border-color: var(--primary);
+  background: #F4F7F5;
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+/* Quick reload / wallet top-up */
+.quick-topup-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.quick-topup-btn {
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+.quick-topup-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #FFFFFF;
+  transform: translateY(-1px);
 }

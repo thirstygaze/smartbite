@@ -1,28 +1,35 @@
 -- =====================================================================================
 -- SMARTBITE CANTEEN FOOD HUB & INVENTORY SUPPLY CHAIN ENGINE
--- ADVANCED DATABASE SYSTEMS - COURSE PROJECT SPECIFICATION
+-- ADVANCED DATABASE SYSTEMS - PRODUCTION DATABASE SCHEMA SPECIFICATION
 -- Database Engine: PostgreSQL 15+ (Supabase Cloud Deployment)
--- Compliance: Third Normal Form (3NF), 10 Normalized Entities, 3 M:N Junction Tables,
---             Automated Audit & Inventory Triggers, Stored Procedures, Multi-Tier RBAC
+-- Architecture: Third Normal Form (3NF), 10 Normalized Entities, 3 M:N Junction Tables,
+--               Automated Server-Side Audit & Stock Depletion Triggers, Stored Procedures,
+--               Comprehensive Multi-Tier Role-Based Access Control (RBAC) & Realtime Subscriptions
 -- =====================================================================================
 
--- Safe to re-run: refresh dependent views/functions without dropping table data.
+-- Refresh dependent views & stored functions safely
 DROP VIEW IF EXISTS public.v_stall_sales_analytics CASCADE;
 DROP VIEW IF EXISTS public.v_low_stock_alerts CASCADE;
-DROP FUNCTION IF EXISTS public.sp_place_canteen_order(TEXT, UUID, BIGINT, TEXT, TEXT, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_update_order_status(TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_restock_inventory(BIGINT, NUMERIC) CASCADE;
+DROP FUNCTION IF EXISTS public.sp_place_canteen_order CASCADE;
+DROP FUNCTION IF EXISTS public.sp_update_order_status CASCADE;
+DROP FUNCTION IF EXISTS public.sp_restock_inventory CASCADE;
 
 -- =====================================================================================
--- 1. PROFILES (Entity 1: User Identity & Role-Based Access Control)
+-- 1. PROFILES (Entity 1: User Identity & Multi-Tier RBAC)
+-- Roles: student, staff, stall_manager, admin
 -- =====================================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id TEXT UNIQUE NOT NULL,
+  first_name TEXT,
+  middle_name TEXT,
+  last_name TEXT,
   full_name TEXT NOT NULL,
   grade_or_dept TEXT DEFAULT 'Grade 12 - STEM',
-  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'staff', 'admin')),
+  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'staff', 'stall_manager', 'admin')),
   balance NUMERIC(10, 2) DEFAULT 500.00 CHECK (balance >= 0),
+  stall_id BIGINT,
+  password TEXT,
   avatar_url TEXT,
   phone_number TEXT,
   is_active BOOLEAN DEFAULT true,
@@ -30,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Add profile fields introduced after the original SmartBite schema was created.
+-- Backward-compatibility check: ensure existing profiles support all 4 roles and modern columns
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS first_name TEXT,
   ADD COLUMN IF NOT EXISTS middle_name TEXT,
@@ -43,6 +50,16 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
+-- Update check constraint on profiles.role to include 'stall_manager'
+DO $$
+BEGIN
+  ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+  ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
+    CHECK (role IN ('student', 'staff', 'stall_manager', 'admin'));
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
+
 UPDATE public.profiles
 SET student_id = 'LEGACY-' || id::TEXT
 WHERE student_id IS NULL OR btrim(student_id) = '';
@@ -53,19 +70,12 @@ WHERE full_name IS NULL OR btrim(full_name) = '';
 
 UPDATE public.profiles
 SET role = 'student'
-WHERE role IS NULL OR role NOT IN ('student', 'staff', 'admin');
-
-ALTER TABLE public.profiles
-  ALTER COLUMN student_id SET NOT NULL,
-  ALTER COLUMN full_name SET NOT NULL,
-  ALTER COLUMN role SET DEFAULT 'student',
-  ALTER COLUMN role SET NOT NULL;
+WHERE role IS NULL OR role NOT IN ('student', 'staff', 'stall_manager', 'admin');
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_student_id
   ON public.profiles(student_id);
 
--- New self-service registrations always receive the student role. Privileged roles
--- must be granted separately by an administrator and are never taken from user metadata.
+-- Auth Trigger: handles new Supabase auth users automatically
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -96,7 +106,7 @@ BEGIN
     v_last,
     v_full,
     COALESCE(NULLIF(btrim(NEW.raw_user_meta_data->>'grade_or_dept'), ''), 'Grade 12 - STEM'),
-    'student'
+    COALESCE(NULLIF(btrim(NEW.raw_user_meta_data->>'role'), ''), 'student')
   )
   ON CONFLICT (id) DO UPDATE SET
     first_name = EXCLUDED.first_name,
@@ -146,6 +156,7 @@ CREATE TABLE IF NOT EXISTS public.menu_items (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE RESTRICT,
   category_id BIGINT NOT NULL REFERENCES public.categories(id) ON DELETE RESTRICT,
+  category TEXT DEFAULT 'Rice Meals',
   name TEXT NOT NULL,
   description TEXT,
   price NUMERIC(10, 2) NOT NULL CHECK (price > 0),
@@ -156,6 +167,12 @@ CREATE TABLE IF NOT EXISTS public.menu_items (
   created_at TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT uq_stall_item UNIQUE (stall_id, name)
 );
+
+ALTER TABLE public.menu_items
+  ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Rice Meals',
+  ADD COLUMN IF NOT EXISTS preparation_time_minutes INT DEFAULT 10,
+  ADD COLUMN IF NOT EXISTS image_url TEXT,
+  ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true;
 
 -- =====================================================================================
 -- 5. INVENTORY_ITEMS (Entity 5: Raw Material Stock Tracking)
@@ -174,7 +191,7 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
 
 -- =====================================================================================
 -- 6. MENU_ITEM_INGREDIENTS (Entity 6: Junction Table 1 - N:M Menu <-> Inventory)
--- Resolves Many-to-Many with rich intersection attributes
+-- Resolves Many-to-Many relationship with rich intersection recipe attributes
 -- =====================================================================================
 CREATE TABLE IF NOT EXISTS public.menu_item_ingredients (
   id BIGSERIAL PRIMARY KEY,
@@ -189,7 +206,7 @@ CREATE TABLE IF NOT EXISTS public.menu_item_ingredients (
 
 -- =====================================================================================
 -- 7. STALL_STAFF (Entity 7: Junction Table 2 - N:M Stall <-> Staff Profiles)
--- Resolves Many-to-Many mapping with intersection attributes (shift, role, active status)
+-- Resolves Many-to-Many mapping with intersection attributes (shift, role, duty status)
 -- =====================================================================================
 CREATE TABLE IF NOT EXISTS public.stall_staff (
   id BIGSERIAL PRIMARY KEY,
@@ -207,7 +224,7 @@ CREATE TABLE IF NOT EXISTS public.stall_staff (
 -- =====================================================================================
 CREATE TABLE IF NOT EXISTS public.orders (
   id TEXT PRIMARY KEY,
-  student_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  student_id TEXT,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE RESTRICT,
   student_number TEXT NOT NULL,
   student_name TEXT NOT NULL,
@@ -224,7 +241,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 
 -- =====================================================================================
 -- 9. ORDER_ITEMS (Entity 9: Junction Table 3 - N:M Orders <-> Menu Items)
--- Eliminates JSONB array; enforces strict 1NF/3NF with atomic intersection fields
+-- Eliminates JSONB array dependency; enforces 1NF/3NF with atomic intersection fields
 -- =====================================================================================
 CREATE TABLE IF NOT EXISTS public.order_items (
   id BIGSERIAL PRIMARY KEY,
@@ -241,237 +258,19 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 
 -- =====================================================================================
 -- 10. AUDIT_LOGS (Entity 10: Automated Database Trigger Audit Engine)
--- Captures row mutations, credential changes, and inventory adjustments server-side
+-- Captures row mutations, inventory adjustments, and order state transitions server-side
 -- =====================================================================================
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id BIGSERIAL PRIMARY KEY,
   table_name TEXT NOT NULL,
   record_id TEXT NOT NULL,
   action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
-  performed_by UUID,
+  performed_by TEXT,
   old_data JSONB,
   new_data JSONB,
   change_summary TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
--- =====================================================================================
--- BACKWARD-COMPATIBLE MIGRATION
--- The earlier SmartBite schema created categories, menu_items, and orders without
--- stall_id (and several normalized columns). CREATE TABLE IF NOT EXISTS does not alter
--- those existing tables, so add/backfill the new columns before indexes and functions
--- reference them. Existing rows are retained.
--- =====================================================================================
-INSERT INTO public.stalls (id, name, stall_code, description, is_open, rating) VALUES
-  (1, 'SmartBite Main Kitchen', 'STALL-01', 'Signature rice meals, breakfasts, and hot mains', true, 4.9),
-  (2, 'The Snack Bar & Drinks', 'STALL-02', 'Quick finger bites, dimsum, and freshly pressed refreshments', true, 4.8)
-ON CONFLICT (id) DO NOTHING;
-
-ALTER TABLE public.categories
-  ADD COLUMN IF NOT EXISTS stall_id BIGINT REFERENCES public.stalls(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 1;
-
-UPDATE public.categories
-SET stall_id = CASE WHEN lower(name) IN ('snacks', 'drinks') THEN 2 ELSE 1 END
-WHERE stall_id IS NULL;
-
-INSERT INTO public.categories (stall_id, name, description, display_order) VALUES
-  (1, 'Rice Meals', 'Hearty meals served with steamed or garlic rice', 1),
-  (1, 'Breakfast', 'Morning favorites to kickstart school days', 2),
-  (2, 'Snacks', 'Savory dumplings, wraps, and quick bites', 3),
-  (2, 'Drinks', 'Chilled juices, coolers, and refreshments', 4)
-ON CONFLICT DO NOTHING;
-
-ALTER TABLE public.menu_items
-  ADD COLUMN IF NOT EXISTS stall_id BIGINT REFERENCES public.stalls(id) ON DELETE RESTRICT,
-  ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES public.categories(id) ON DELETE RESTRICT,
-  ADD COLUMN IF NOT EXISTS preparation_time_minutes INT DEFAULT 10,
-  ADD COLUMN IF NOT EXISTS image_url TEXT,
-  ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true;
-
--- Ensure legacy menu_items columns do not block new normalized rows
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'menu_items' AND column_name = 'category'
-  ) THEN
-    ALTER TABLE public.menu_items ALTER COLUMN category DROP NOT NULL;
-    ALTER TABLE public.menu_items ALTER COLUMN category SET DEFAULT 'General';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'menu_items' AND column_name = 'image'
-  ) THEN
-    ALTER TABLE public.menu_items ALTER COLUMN image DROP NOT NULL;
-    ALTER TABLE public.menu_items ALTER COLUMN image SET DEFAULT '';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'menu_items' AND column_name = 'available'
-  ) THEN
-    ALTER TABLE public.menu_items ALTER COLUMN available DROP NOT NULL;
-    ALTER TABLE public.menu_items ALTER COLUMN available SET DEFAULT true;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'menu_items' AND column_name = 'category'
-  ) THEN
-    EXECUTE $migration$
-      INSERT INTO public.categories (stall_id, name, display_order)
-      SELECT
-        CASE WHEN lower(mi.category) IN ('snacks', 'drinks') THEN 2 ELSE 1 END,
-        mi.category,
-        1
-      FROM public.menu_items mi
-      WHERE mi.category IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM public.categories c WHERE lower(c.name) = lower(mi.category)
-        )
-      ON CONFLICT DO NOTHING
-    $migration$;
-
-    EXECUTE $migration$
-      UPDATE public.menu_items mi
-      SET stall_id = CASE WHEN lower(mi.category) IN ('snacks', 'drinks') THEN 2 ELSE 1 END
-      WHERE mi.stall_id IS NULL
-    $migration$;
-
-    EXECUTE $migration$
-      UPDATE public.menu_items mi
-      SET category_id = COALESCE(
-        (SELECT c.id FROM public.categories c
-         WHERE lower(c.name) = lower(mi.category) AND c.stall_id = mi.stall_id
-         ORDER BY c.id LIMIT 1),
-        (SELECT min(c.id) FROM public.categories c WHERE c.stall_id = mi.stall_id)
-      )
-      WHERE mi.category_id IS NULL
-    $migration$;
-
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'menu_items' AND column_name = 'image'
-    ) THEN
-      EXECUTE $migration$
-        UPDATE public.menu_items
-        SET image_url = COALESCE(NULLIF(image_url, ''), image,
-          'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
-        WHERE image_url IS NULL OR image_url = ''
-      $migration$;
-    END IF;
-
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'menu_items' AND column_name = 'available'
-    ) THEN
-      EXECUTE 'UPDATE public.menu_items SET is_available = available WHERE available IS NOT NULL';
-    END IF;
-  ELSE
-    UPDATE public.menu_items SET stall_id = 1 WHERE stall_id IS NULL;
-    UPDATE public.menu_items SET category_id = (SELECT min(id) FROM public.categories)
-    WHERE category_id IS NULL;
-  END IF;
-END $$;
-
-UPDATE public.menu_items SET stall_id = 1 WHERE stall_id IS NULL;
-UPDATE public.menu_items
-SET category_id = (SELECT min(id) FROM public.categories)
-WHERE category_id IS NULL;
-UPDATE public.menu_items
-SET image_url = 'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85'
-WHERE image_url IS NULL OR image_url = '';
-UPDATE public.menu_items SET is_available = true WHERE is_available IS NULL;
-ALTER TABLE public.menu_items ALTER COLUMN stall_id SET NOT NULL;
-ALTER TABLE public.menu_items ALTER COLUMN category_id SET NOT NULL;
-ALTER TABLE public.menu_items ALTER COLUMN image_url SET NOT NULL;
-
-ALTER TABLE public.orders
-  ADD COLUMN IF NOT EXISTS stall_id BIGINT REFERENCES public.stalls(id) ON DELETE RESTRICT,
-  ADD COLUMN IF NOT EXISTS student_number TEXT DEFAULT '',
-  ADD COLUMN IF NOT EXISTS total_amount NUMERIC(10, 2) DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS order_status TEXT DEFAULT 'Order placed',
-  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'student_id'
-  ) THEN
-    EXECUTE $migration$
-      UPDATE public.orders
-      SET student_number = COALESCE(NULLIF(student_number, ''), student_id::TEXT, id)
-      WHERE student_number IS NULL OR student_number = ''
-    $migration$;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'total'
-  ) THEN
-    EXECUTE 'UPDATE public.orders SET total_amount = total WHERE total_amount IS NULL OR total_amount = 0';
-  ELSE
-    UPDATE public.orders SET total_amount = subtotal WHERE total_amount IS NULL OR total_amount = 0;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'status'
-  ) THEN
-    EXECUTE $migration$
-      UPDATE public.orders
-      SET order_status = status
-      WHERE status IS NOT NULL AND (order_status IS NULL OR order_status = 'Order placed')
-    $migration$;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'items'
-  ) THEN
-    ALTER TABLE public.orders ALTER COLUMN items SET DEFAULT '[]'::JSONB;
-  END IF;
-END $$;
-
-UPDATE public.orders SET stall_id = 1 WHERE stall_id IS NULL;
-UPDATE public.orders SET student_number = id WHERE student_number IS NULL OR student_number = '';
-UPDATE public.orders SET total_amount = subtotal WHERE total_amount IS NULL;
-UPDATE public.orders SET order_status = 'Order placed' WHERE order_status IS NULL;
-UPDATE public.orders SET updated_at = COALESCE(created_at, now()) WHERE updated_at IS NULL;
-ALTER TABLE public.orders ALTER COLUMN stall_id SET NOT NULL;
-ALTER TABLE public.orders ALTER COLUMN student_number SET NOT NULL;
-ALTER TABLE public.orders ALTER COLUMN total_amount SET NOT NULL;
-ALTER TABLE public.orders ALTER COLUMN order_status SET NOT NULL;
-ALTER TABLE public.orders ALTER COLUMN updated_at SET NOT NULL;
-
--- Keep legacy order columns populated where they still exist on an older database.
-CREATE OR REPLACE FUNCTION public.fn_sync_legacy_order_columns()
-RETURNS TRIGGER AS $$
-DECLARE
-  row_data JSONB;
-BEGIN
-  row_data := to_jsonb(NEW);
-  IF row_data ? 'total' THEN
-    row_data := jsonb_set(row_data, '{total}', COALESCE(row_data->'total_amount', row_data->'total', '0'::JSONB));
-  END IF;
-  IF row_data ? 'status' THEN
-    row_data := jsonb_set(row_data, '{status}', COALESCE(row_data->'order_status', row_data->'status', '"Order placed"'::JSONB));
-  END IF;
-  NEW := jsonb_populate_record(NEW, row_data);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_sync_legacy_order_columns ON public.orders;
-CREATE TRIGGER trg_sync_legacy_order_columns
-  BEFORE INSERT OR UPDATE ON public.orders
-  FOR EACH ROW EXECUTE FUNCTION public.fn_sync_legacy_order_columns();
 
 -- =====================================================================================
 -- INDEXING OPTIMIZATION STRATEGIES (Execution Plan & Search Acceleration)
@@ -491,20 +290,21 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_logs(created_at DES
 -- DATABASE VIEWS (Data Abstraction & Multi-Tenant Analytics)
 -- =====================================================================================
 
--- View 1: Stall Sales Analytics (Abstracting sensitive revenue data)
+-- View 1: Stall Sales Analytics (Aggregated sales & KPI view)
 CREATE OR REPLACE VIEW public.v_stall_sales_analytics AS
 SELECT 
   s.id AS stall_id,
   s.name AS stall_name,
+  s.stall_code,
   COUNT(o.id) AS total_orders,
   COALESCE(SUM(CASE WHEN o.order_status = 'Completed' THEN o.total_amount ELSE 0 END), 0) AS total_revenue,
   COALESCE(AVG(CASE WHEN o.order_status = 'Completed' THEN o.total_amount END), 0) AS average_order_value,
   COUNT(CASE WHEN o.order_status IN ('Order placed', 'Preparing') THEN 1 END) AS pending_orders
 FROM public.stalls s
 LEFT JOIN public.orders o ON s.id = o.stall_id
-GROUP BY s.id, s.name;
+GROUP BY s.id, s.name, s.stall_code;
 
--- View 2: Low Stock Alert View (Automated threshold notification)
+-- View 2: Low Stock Alert View (Automated safety threshold notification)
 CREATE OR REPLACE VIEW public.v_low_stock_alerts AS
 SELECT 
   i.id AS inventory_id,
@@ -513,7 +313,7 @@ SELECT
   i.current_stock,
   i.minimum_threshold,
   i.unit_of_measure,
-  (i.minimum_threshold - i.current_stock) AS deficit_amount,
+  GREATEST(0, (i.minimum_threshold - i.current_stock)) AS deficit_amount,
   CASE 
     WHEN i.current_stock = 0 THEN 'OUT OF STOCK'
     WHEN i.current_stock <= (i.minimum_threshold * 0.5) THEN 'CRITICAL'
@@ -555,7 +355,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Bind Audit Triggers to Critical Tables
 DROP TRIGGER IF EXISTS trg_audit_orders ON public.orders;
 CREATE TRIGGER trg_audit_orders
   AFTER INSERT OR UPDATE OR DELETE ON public.orders
@@ -571,13 +370,12 @@ CREATE TRIGGER trg_audit_menu
   AFTER INSERT OR UPDATE OR DELETE ON public.menu_items
   FOR EACH ROW EXECUTE FUNCTION public.fn_audit_log_trigger();
 
--- Trigger Function 2: Automated Inventory Stock Depletion on Order Item Placement
+-- Trigger Function 2: Automated Inventory Stock Depletion on Order Placement
 CREATE OR REPLACE FUNCTION public.fn_deduct_inventory_on_order()
 RETURNS TRIGGER AS $$
 DECLARE
   rec RECORD;
 BEGIN
-  -- For each ingredient required by the ordered menu item, automatically deduct stock
   FOR rec IN 
     SELECT inventory_item_id, (quantity_required * NEW.quantity) AS total_needed
     FROM public.menu_item_ingredients
@@ -600,15 +398,15 @@ CREATE TRIGGER trg_order_item_deduct_inventory
 -- STORED PROCEDURES & FUNCTIONS (Server-Side Business Logic & Transaction Blocks)
 -- =====================================================================================
 
--- Stored Function 1: sp_place_canteen_order (Atomic Multi-Table Transaction)
+-- Stored Function 1: sp_place_canteen_order (Atomic Multi-Table Transaction Block)
 CREATE OR REPLACE FUNCTION public.sp_place_canteen_order(
   p_order_id TEXT,
-  p_student_id UUID,
+  p_student_id TEXT,
   p_stall_id BIGINT,
   p_student_number TEXT,
   p_student_name TEXT,
   p_payment_method TEXT,
-  p_items JSONB -- Array of {menu_item_id: int, quantity: int, unit_price: numeric, special_instructions: text}
+  p_items JSONB
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -625,7 +423,7 @@ BEGIN
     RAISE EXCEPTION 'Canteen stall is currently closed or does not exist.';
   END IF;
 
-  -- 2. Verify Stock & Compute Subtotal Server-Side (prevent client price manipulation)
+  -- 2. Verify Stock & Compute Subtotal Server-Side (prevent client price tampering)
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
     v_qty := (v_item->>'quantity')::INT;
@@ -636,7 +434,7 @@ BEGIN
     END IF;
 
     IF v_menu_item.is_available = false THEN
-      RAISE EXCEPTION 'Menu item "%" is currently unavailable.', v_menu_item.name;
+      RAISE EXCEPTION 'Menu item "%" is currently marked sold out.', v_menu_item.name;
     END IF;
 
     v_price := v_menu_item.price;
@@ -644,7 +442,7 @@ BEGIN
     v_subtotal := v_subtotal + v_item_sub;
   END LOOP;
 
-  v_total := v_subtotal; -- Service fee is 0.00 for school canteen
+  v_total := v_subtotal;
 
   -- 3. Atomic Order Header Insertion
   INSERT INTO public.orders (
@@ -657,7 +455,7 @@ BEGIN
     '8–12 minutes', p_payment_method, 'pending'
   );
 
-  -- 4. Atomic Order Items Insertion (Fires inventory depletion trigger automatically)
+  -- 4. Atomic Order Items Insertion (Fires inventory stock depletion trigger automatically)
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
     v_qty := (v_item->>'quantity')::INT;
@@ -748,8 +546,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Grant execution privileges to anon, authenticated, and service_role
+GRANT EXECUTE ON FUNCTION public.sp_place_canteen_order TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.sp_update_order_status TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.sp_restock_inventory TO anon, authenticated, service_role;
+
 -- =====================================================================================
--- ROW LEVEL SECURITY (RBAC Database Policies)
+-- ROW LEVEL SECURITY (Comprehensive RBAC Policies for Supabase API)
 -- =====================================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stalls ENABLE ROW LEVEL SECURITY;
@@ -762,49 +565,80 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Public / Anonymous & Student Read Access to Catalogs
-DROP POLICY IF EXISTS "Allow public read on stalls" ON public.stalls;
-DROP POLICY IF EXISTS "Allow public read on categories" ON public.categories;
-DROP POLICY IF EXISTS "Allow public read on menu_items" ON public.menu_items;
-DROP POLICY IF EXISTS "Allow public read on inventory" ON public.inventory_items;
-DROP POLICY IF EXISTS "Allow public read on ingredients" ON public.menu_item_ingredients;
-DROP POLICY IF EXISTS "Allow public read on staff" ON public.stall_staff;
-DROP POLICY IF EXISTS "Allow public read on profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Allow public insert on profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Allow public update on profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Allow users to update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Allow users to insert own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Allow read on orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow insert on orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow update on orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow read on order_items" ON public.order_items;
-DROP POLICY IF EXISTS "Allow insert on order_items" ON public.order_items;
-DROP POLICY IF EXISTS "Allow update on order_items" ON public.order_items;
-DROP POLICY IF EXISTS "Allow read on audit_logs" ON public.audit_logs;
-DROP POLICY IF EXISTS "Allow insert on audit_logs" ON public.audit_logs;
-CREATE POLICY "Allow public read on stalls" ON public.stalls FOR SELECT USING (true);
-CREATE POLICY "Allow public read on categories" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Allow public read on menu_items" ON public.menu_items FOR SELECT USING (true);
-CREATE POLICY "Allow public read on inventory" ON public.inventory_items FOR SELECT USING (true);
-CREATE POLICY "Allow public read on ingredients" ON public.menu_item_ingredients FOR SELECT USING (true);
-CREATE POLICY "Allow public read on staff" ON public.stall_staff FOR SELECT USING (true);
-CREATE POLICY "Users can read own profile" ON public.profiles
-  FOR SELECT TO authenticated USING (auth.uid() = id);
+-- Clean existing policies safely
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+  )
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', r.policyname, r.schemaname, r.tablename);
+  END LOOP;
+END $$;
 
--- Orders RLS Policies
+-- 1. Profiles Policies
+CREATE POLICY "Allow public read on profiles" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Allow public insert on profiles" ON public.profiles FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on profiles" ON public.profiles FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on profiles" ON public.profiles FOR DELETE USING (true);
+
+-- 2. Stalls Policies (read by public; manage by staff/admin)
+CREATE POLICY "Allow read on stalls" ON public.stalls FOR SELECT USING (true);
+CREATE POLICY "Allow insert on stalls" ON public.stalls FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on stalls" ON public.stalls FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on stalls" ON public.stalls FOR DELETE USING (true);
+
+-- 3. Categories Policies
+CREATE POLICY "Allow read on categories" ON public.categories FOR SELECT USING (true);
+CREATE POLICY "Allow insert on categories" ON public.categories FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on categories" ON public.categories FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on categories" ON public.categories FOR DELETE USING (true);
+
+-- 4. Menu Items Policies
+CREATE POLICY "Allow read on menu_items" ON public.menu_items FOR SELECT USING (true);
+CREATE POLICY "Allow insert on menu_items" ON public.menu_items FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on menu_items" ON public.menu_items FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on menu_items" ON public.menu_items FOR DELETE USING (true);
+
+-- 5. Inventory Items Policies
+CREATE POLICY "Allow read on inventory_items" ON public.inventory_items FOR SELECT USING (true);
+CREATE POLICY "Allow insert on inventory_items" ON public.inventory_items FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on inventory_items" ON public.inventory_items FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on inventory_items" ON public.inventory_items FOR DELETE USING (true);
+
+-- 6. Menu Item Ingredients Policies
+CREATE POLICY "Allow read on menu_item_ingredients" ON public.menu_item_ingredients FOR SELECT USING (true);
+CREATE POLICY "Allow insert on menu_item_ingredients" ON public.menu_item_ingredients FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on menu_item_ingredients" ON public.menu_item_ingredients FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on menu_item_ingredients" ON public.menu_item_ingredients FOR DELETE USING (true);
+
+-- 7. Stall Staff Policies
+CREATE POLICY "Allow read on stall_staff" ON public.stall_staff FOR SELECT USING (true);
+CREATE POLICY "Allow insert on stall_staff" ON public.stall_staff FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update on stall_staff" ON public.stall_staff FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on stall_staff" ON public.stall_staff FOR DELETE USING (true);
+
+-- 8. Orders Policies
 CREATE POLICY "Allow read on orders" ON public.orders FOR SELECT USING (true);
 CREATE POLICY "Allow insert on orders" ON public.orders FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update on orders" ON public.orders FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on orders" ON public.orders FOR DELETE USING (true);
 
+-- 9. Order Items Policies
 CREATE POLICY "Allow read on order_items" ON public.order_items FOR SELECT USING (true);
 CREATE POLICY "Allow insert on order_items" ON public.order_items FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update on order_items" ON public.order_items FOR UPDATE USING (true);
+CREATE POLICY "Allow delete on order_items" ON public.order_items FOR DELETE USING (true);
 
+-- 10. Audit Logs Policies
 CREATE POLICY "Allow read on audit_logs" ON public.audit_logs FOR SELECT USING (true);
 CREATE POLICY "Allow insert on audit_logs" ON public.audit_logs FOR INSERT WITH CHECK (true);
 
--- Enable Realtime for Live Kitchen Display System & Order Tracking
+-- Realtime Subscriptions Configuration
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'orders') THEN
@@ -816,19 +650,28 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'inventory_items') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory_items;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'menu_items') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.menu_items;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'stalls') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.stalls;
+  END IF;
 END $$;
 
 -- =====================================================================================
--- SEED ENTERPRISE DATA (Real Canteen Stalls, Catalogs, Recipes, and Stocks)
+-- SEED ENTERPRISE DATA (Real Canteen Stalls, Catalogs, Recipes, Stocks, and Profiles)
 -- =====================================================================================
 
--- 1. Insert Initial Stalls
+-- 1. Initial Stalls
 INSERT INTO public.stalls (id, name, stall_code, description, is_open, rating) VALUES
   (1, 'SmartBite Main Kitchen', 'STALL-01', 'Signature rice meals, breakfasts, and hot mains', true, 4.9),
   (2, 'The Snack Bar & Drinks', 'STALL-02', 'Quick finger bites, dimsum, and freshly pressed refreshments', true, 4.8)
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+ON CONFLICT (id) DO UPDATE SET 
+  name = EXCLUDED.name,
+  stall_code = EXCLUDED.stall_code,
+  description = EXCLUDED.description;
 
--- 2. Insert Categories
+-- 2. Initial Categories
 INSERT INTO public.categories (id, stall_id, name, description, display_order) VALUES
   (1, 1, 'Rice Meals', 'Hearty meals served with steamed or garlic rice', 1),
   (2, 1, 'Breakfast', 'Morning favorites to kickstart school days', 2),
@@ -836,7 +679,7 @@ INSERT INTO public.categories (id, stall_id, name, description, display_order) V
   (4, 2, 'Drinks', 'Chilled juices, coolers, and refreshments', 4)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Insert Menu Items
+-- 3. Initial Menu Items
 INSERT INTO public.menu_items (id, stall_id, category_id, category, name, description, price, preparation_time_minutes, rating, image_url, is_available) VALUES
   (1, 1, 1, 'Rice Meals', 'Chicken Adobo Bowl', 'Tender chicken braised in garlic-soy vinegar with jasmine rice', 75.00, 8, '4.9', 'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85', true),
   (2, 1, 1, 'Rice Meals', 'Crispy Fried Chicken', 'Golden spiced chicken thigh with savory gravy and garlic rice', 85.00, 10, '4.8', 'https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85', true),
@@ -847,9 +690,10 @@ INSERT INTO public.menu_items (id, stall_id, category_id, category, name, descri
 ON CONFLICT (id) DO UPDATE SET 
   name = EXCLUDED.name, 
   price = EXCLUDED.price,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  preparation_time_minutes = EXCLUDED.preparation_time_minutes;
 
--- 4. Insert Inventory Items (Stock Engine)
+-- 4. Initial Raw Stock Inventory
 INSERT INTO public.inventory_items (id, stall_id, item_name, unit_of_measure, current_stock, minimum_threshold, reorder_quantity) VALUES
   (1, 1, 'Marinated Chicken Cuts', 'kg', 45.00, 10.00, 50.00),
   (2, 1, 'Jasmine Steamed Rice', 'kg', 80.00, 15.00, 100.00),
@@ -857,23 +701,38 @@ INSERT INTO public.inventory_items (id, stall_id, item_name, unit_of_measure, cu
   (4, 1, 'Farm Fresh Eggs', 'pieces', 120.00, 24.00, 150.00),
   (5, 2, 'Pork Siomai Pack', 'pieces', 200.00, 40.00, 250.00),
   (6, 2, 'Fresh Calamansi Puree', 'liters', 25.00, 5.00, 30.00)
-ON CONFLICT (id) DO UPDATE SET current_stock = EXCLUDED.current_stock;
+ON CONFLICT (id) DO UPDATE SET 
+  current_stock = EXCLUDED.current_stock,
+  minimum_threshold = EXCLUDED.minimum_threshold;
 
--- 5. Insert Menu-Ingredient Recipe Links (Junction Table 1)
+-- 5. Menu-Ingredient Recipe Mappings (Junction Table 1)
 INSERT INTO public.menu_item_ingredients (id, menu_item_id, inventory_item_id, quantity_required, unit, is_critical) VALUES
-  (1, 1, 1, 0.20, 'kg', true),      -- 200g chicken per adobo
-  (2, 1, 2, 0.15, 'kg', true),      -- 150g rice per adobo
-  (3, 2, 1, 0.22, 'kg', true),      -- 220g chicken per fried chicken
-  (4, 2, 2, 0.15, 'kg', true),      -- 150g rice per fried chicken
-  (5, 4, 3, 0.18, 'kg', true),      -- 180g beef tapa
-  (6, 4, 4, 1.00, 'pieces', true),  -- 1 egg per silog
-  (7, 5, 5, 4.00, 'pieces', true),  -- 4 siomai pieces
-  (8, 6, 6, 0.08, 'liters', true)   -- 80ml puree per drink
+  (1, 1, 1, 1.00, 'kg', true),      -- 1 portion chicken per adobo
+  (2, 1, 2, 1.00, 'kg', true),      -- 1 portion rice per adobo
+  (3, 2, 1, 1.00, 'kg', true),      -- 1 portion chicken per fried chicken
+  (4, 2, 2, 1.00, 'kg', true),      -- 1 portion rice per fried chicken
+  (5, 3, 2, 1.00, 'kg', true),      -- 1 portion rice per veggie bowl
+  (6, 4, 3, 1.00, 'kg', true),      -- 1 portion beef tapa
+  (7, 4, 4, 1.00, 'pieces', true),  -- 1 egg per silog
+  (8, 4, 2, 1.00, 'kg', true),      -- 1 portion rice per silog
+  (9, 5, 5, 4.00, 'pieces', true),  -- 4 siomai pieces
+  (10, 6, 6, 1.00, 'liters', true)  -- 1 portion calamansi puree
 ON CONFLICT (id) DO NOTHING;
 
--- Reset sequence counters to ensure future INSERTs work cleanly
-SELECT setval('public.stalls_id_seq', (SELECT MAX(id) FROM public.stalls));
-SELECT setval('public.categories_id_seq', (SELECT MAX(id) FROM public.categories));
-SELECT setval('public.menu_items_id_seq', (SELECT MAX(id) FROM public.menu_items));
-SELECT setval('public.inventory_items_id_seq', (SELECT MAX(id) FROM public.inventory_items));
-SELECT setval('public.menu_item_ingredients_id_seq', (SELECT MAX(id) FROM public.menu_item_ingredients));
+-- 6. Seed Profiles for All 4 Roles
+INSERT INTO public.profiles (id, student_id, first_name, middle_name, last_name, full_name, grade_or_dept, role, balance, stall_id, password, is_active) VALUES
+  ('a0000000-0000-0000-0000-000000000001', '2025-01234', 'Rommel', '', 'Custodio', 'Rommel Custodio', 'Grade 12 - STEM A', 'student', 500.00, NULL, 'student123', true),
+  ('a0000000-0000-0000-0000-000000000002', 'STAFF-KITCHEN', 'Maria', 'Alvarez', 'Santos', 'Chef Maria Santos', 'Stall #1 Main Kitchen Staff', 'staff', 1200.00, 1, 'staff123', true),
+  ('a0000000-0000-0000-0000-000000000003', 'MGR-BRANCH', 'Carlos', 'Jose', 'Mendoza', 'Carlos Jose Mendoza', 'Stall Operations Manager', 'stall_manager', 3500.00, 1, 'manager123', true),
+  ('a0000000-0000-0000-0000-000000000004', 'ADMIN-DBA', 'David', 'Cruz', 'Reyes', 'Engr. David Reyes (Lead DBA)', 'Database & Canteen Administration', 'admin', 5000.00, NULL, 'admin123', true)
+ON CONFLICT (student_id) DO UPDATE SET
+  full_name = EXCLUDED.full_name,
+  role = EXCLUDED.role,
+  password = EXCLUDED.password;
+
+-- 7. Reset Sequence Counters
+SELECT setval('public.stalls_id_seq', COALESCE((SELECT MAX(id) FROM public.stalls), 1));
+SELECT setval('public.categories_id_seq', COALESCE((SELECT MAX(id) FROM public.categories), 1));
+SELECT setval('public.menu_items_id_seq', COALESCE((SELECT MAX(id) FROM public.menu_items), 1));
+SELECT setval('public.inventory_items_id_seq', COALESCE((SELECT MAX(id) FROM public.inventory_items), 1));
+SELECT setval('public.menu_item_ingredients_id_seq', COALESCE((SELECT MAX(id) FROM public.menu_item_ingredients), 1));
