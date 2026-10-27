@@ -12,11 +12,55 @@ export const SUPABASE_ANON_KEY =
   import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   'sb_publishable_cJk4jM2_UbvuoFJq0bbNAg_MPRdR3QS'
 
+const MENU_IMAGE_BUCKET = 'menu-images'
+const MAX_MENU_IMAGE_SIZE = 5 * 1024 * 1024
+
+export async function uploadMenuImage(file: File, stallId: number): Promise<string> {
+  const allowedTypes: Record<string, string> = {
+    'image/avif': 'avif',
+    'image/gif': 'gif',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+  }
+  const extension = allowedTypes[file.type]
+
+  if (!extension) {
+    throw new Error('Choose a JPG, PNG, WebP, GIF, or AVIF image.')
+  }
+  if (file.size > MAX_MENU_IMAGE_SIZE) {
+    throw new Error('The image must be 5 MB or smaller.')
+  }
+
+  const fileName = `${stallId}/${Date.now()}-${crypto.randomUUID()}.${extension}`
+  const response = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/${MENU_IMAGE_BUCKET}/${fileName}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': file.type,
+        'x-upsert': 'false',
+      },
+      body: file,
+    }
+  )
+
+  if (!response.ok) {
+    const details = await response.text()
+    throw new Error(`Image upload failed (${response.status}): ${details}`)
+  }
+
+  return `${SUPABASE_URL}/storage/v1/object/public/${MENU_IMAGE_BUCKET}/${fileName}`
+}
+
 export type UserRole = 'student' | 'staff' | 'stall_manager' | 'admin'
 
 export interface Profile {
   id: string
   student_id: string
+  email?: string
   first_name?: string
   middle_name?: string
   last_name?: string
@@ -303,8 +347,9 @@ export const supabase = {
         : 'New User')
 
     const newProfile: Profile = {
-      id: profile.id || `usr-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      student_id: profile.student_id || `ID-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: profile.id || crypto.randomUUID(),
+      student_id: profile.student_id || `PENDING-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+      email: profile.email?.trim().toLowerCase() || undefined,
       first_name: firstName,
       middle_name: middleName,
       last_name: lastName,
@@ -313,7 +358,7 @@ export const supabase = {
       role: profile.role || 'student',
       stall_id: profile.stall_id,
       balance: profile.balance ?? 500.0,
-      password: profile.password || 'user123',
+      password: profile.password,
       is_active: true,
       created_at: new Date().toISOString(),
     }
@@ -564,43 +609,40 @@ export const supabase = {
       ...item,
       category: item.category || 'Rice Meals',
     }
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/menu_items`, {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'return=representation' },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        return Array.isArray(data) ? data[0] : data
-      }
-    } catch {}
-
-    // Fallback local storage
-    const all = await this.getMenuItems()
-    const newItem: MenuItem = {
-      id: Date.now(),
-      ...item,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/menu_items`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=representation' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      throw new Error(`Could not save product to Supabase (${res.status}): ${await res.text()}`)
     }
-    localStorage.setItem('smartbite_menu_items', JSON.stringify([...all, newItem]))
-    return newItem
+
+    const data = await res.json()
+    const created = Array.isArray(data) ? data[0] : data
+    if (!created) throw new Error('Supabase did not return the saved product.')
+    return {
+      ...created,
+      id: Number(created.id),
+      stall_id: Number(created.stall_id),
+      price: Number(created.price),
+    }
   },
 
   async updateMenuItem(id: number, updates: Partial<MenuItem>): Promise<void> {
     const numId = Number(id)
-    try {
-      const payload: any = { ...updates }
-      if (typeof updates.is_available === 'boolean') {
-        payload.is_available = updates.is_available
-        payload.available = updates.is_available
-      }
-      await fetch(`${SUPABASE_URL}/rest/v1/menu_items?id=eq.${numId}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(payload),
-      })
-    } catch (err) {
-      console.warn('updateMenuItem fetch notice:', err)
+    const payload: any = { ...updates }
+    if (typeof updates.is_available === 'boolean') {
+      payload.is_available = updates.is_available
+      payload.available = updates.is_available
+    }
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/menu_items?id=eq.${numId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      throw new Error(`Could not update product in Supabase (${response.status}): ${await response.text()}`)
     }
 
     try {

@@ -1811,6 +1811,16 @@ a {
   gap: 10px;
   background: #FAFBF9;
 }
+.menu-image-preview {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  max-height: 180px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 10px 0;
+}
 
 /* ==========================================================================
    NAME INPUTS & USER MANAGEMENT MODAL STYLES

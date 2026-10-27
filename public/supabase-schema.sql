@@ -7,32 +7,32 @@
 -- =====================================================================================
 
 -- Safe to re-run: refresh dependent views/functions without dropping table data.
-DROP VIEW IF EXISTS public.v_stall_sales_analytics CASCADE;
-DROP VIEW IF EXISTS public.v_low_stock_alerts CASCADE;
-DROP FUNCTION IF EXISTS public.sp_place_canteen_order(TEXT, UUID, BIGINT, TEXT, TEXT, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_update_order_status(TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_restock_inventory(BIGINT, NUMERIC) CASCADE;
-
+DROP VIEW IF EXISTS v_stall_sales_analytics CASCADE;
+DROP VIEW IF EXISTS v_low_stock_alerts CASCADE;
 -- =====================================================================================
 -- 1. PROFILES (Entity 1: User Identity & Role-Based Access Control)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY,
   student_id TEXT UNIQUE NOT NULL,
+  email TEXT,
   full_name TEXT NOT NULL,
   grade_or_dept TEXT DEFAULT 'Grade 12 - STEM',
-  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'staff', 'admin')),
+  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'staff', 'stall_manager', 'admin')),
   balance NUMERIC(10, 2) DEFAULT 500.00 CHECK (balance >= 0),
   avatar_url TEXT,
   phone_number TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT profiles_auth_user_fk
+    FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 -- Add profile fields introduced after the original SmartBite schema was created.
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS first_name TEXT,
+  ADD COLUMN IF NOT EXISTS email TEXT,
   ADD COLUMN IF NOT EXISTS middle_name TEXT,
   ADD COLUMN IF NOT EXISTS last_name TEXT,
   ADD COLUMN IF NOT EXISTS stall_id BIGINT,
@@ -53,7 +53,13 @@ WHERE full_name IS NULL OR btrim(full_name) = '';
 
 UPDATE public.profiles
 SET role = 'student'
-WHERE role IS NULL OR role NOT IN ('student', 'staff', 'admin');
+WHERE role IS NULL OR role NOT IN ('student', 'staff', 'stall_manager', 'admin');
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_role_check
+  CHECK (role IN ('student', 'staff', 'stall_manager', 'admin'));
 
 ALTER TABLE public.profiles
   ALTER COLUMN student_id SET NOT NULL,
@@ -87,10 +93,11 @@ BEGIN
     'Student User'
   );
 
-  INSERT INTO public.profiles (id, student_id, first_name, middle_name, last_name, full_name, grade_or_dept, role)
+  INSERT INTO public.profiles (id, student_id, email, first_name, middle_name, last_name, full_name, grade_or_dept, role)
   VALUES (
     NEW.id,
     COALESCE(NULLIF(btrim(NEW.raw_user_meta_data->>'student_id'), ''), split_part(NEW.email, '@', 1)),
+    NEW.email,
     v_first,
     v_middle,
     v_last,
@@ -99,6 +106,7 @@ BEGIN
     'student'
   )
   ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
     first_name = EXCLUDED.first_name,
     middle_name = EXCLUDED.middle_name,
     last_name = EXCLUDED.last_name,
@@ -115,7 +123,7 @@ CREATE TRIGGER on_auth_user_created
 -- =====================================================================================
 -- 2. STALLS / VENDORS (Entity 2: Multi-Tenant Canteen Stalls)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.stalls (
+CREATE TABLE IF NOT EXISTS stalls (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   stall_code TEXT NOT NULL UNIQUE,
@@ -129,7 +137,7 @@ CREATE TABLE IF NOT EXISTS public.stalls (
 -- =====================================================================================
 -- 3. CATEGORIES (Entity 3: Canteen Menu Categorization per Stall)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.categories (
+CREATE TABLE IF NOT EXISTS categories (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT REFERENCES public.stalls(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -142,10 +150,11 @@ CREATE TABLE IF NOT EXISTS public.categories (
 -- =====================================================================================
 -- 4. MENU_ITEMS (Entity 4: Food Catalog in Strict 3NF)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.menu_items (
+CREATE TABLE IF NOT EXISTS menu_items (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE RESTRICT,
   category_id BIGINT NOT NULL REFERENCES public.categories(id) ON DELETE RESTRICT,
+  category TEXT DEFAULT 'Rice Meals',
   name TEXT NOT NULL,
   description TEXT,
   price NUMERIC(10, 2) NOT NULL CHECK (price > 0),
@@ -160,7 +169,7 @@ CREATE TABLE IF NOT EXISTS public.menu_items (
 -- =====================================================================================
 -- 5. INVENTORY_ITEMS (Entity 5: Raw Material Stock Tracking)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.inventory_items (
+CREATE TABLE IF NOT EXISTS inventory_items (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   item_name TEXT NOT NULL,
@@ -176,7 +185,7 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
 -- 6. MENU_ITEM_INGREDIENTS (Entity 6: Junction Table 1 - N:M Menu <-> Inventory)
 -- Resolves Many-to-Many with rich intersection attributes
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.menu_item_ingredients (
+CREATE TABLE IF NOT EXISTS menu_item_ingredients (
   id BIGSERIAL PRIMARY KEY,
   menu_item_id BIGINT NOT NULL REFERENCES public.menu_items(id) ON DELETE CASCADE,
   inventory_item_id BIGINT NOT NULL REFERENCES public.inventory_items(id) ON DELETE RESTRICT,
@@ -191,7 +200,7 @@ CREATE TABLE IF NOT EXISTS public.menu_item_ingredients (
 -- 7. STALL_STAFF (Entity 7: Junction Table 2 - N:M Stall <-> Staff Profiles)
 -- Resolves Many-to-Many mapping with intersection attributes (shift, role, active status)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.stall_staff (
+CREATE TABLE IF NOT EXISTS stall_staff (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -205,7 +214,7 @@ CREATE TABLE IF NOT EXISTS public.stall_staff (
 -- =====================================================================================
 -- 8. ORDERS (Entity 8: Order Header in Strict 3NF)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.orders (
+CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   student_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE RESTRICT,
@@ -226,7 +235,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 -- 9. ORDER_ITEMS (Entity 9: Junction Table 3 - N:M Orders <-> Menu Items)
 -- Eliminates JSONB array; enforces strict 1NF/3NF with atomic intersection fields
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.order_items (
+CREATE TABLE IF NOT EXISTS order_items (
   id BIGSERIAL PRIMARY KEY,
   order_id TEXT NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
   menu_item_id BIGINT NOT NULL REFERENCES public.menu_items(id) ON DELETE RESTRICT,
@@ -243,7 +252,7 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 -- 10. AUDIT_LOGS (Entity 10: Automated Database Trigger Audit Engine)
 -- Captures row mutations, credential changes, and inventory adjustments server-side
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS public.audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGSERIAL PRIMARY KEY,
   table_name TEXT NOT NULL,
   record_id TEXT NOT NULL,
@@ -285,6 +294,7 @@ ON CONFLICT DO NOTHING;
 ALTER TABLE public.menu_items
   ADD COLUMN IF NOT EXISTS stall_id BIGINT REFERENCES public.stalls(id) ON DELETE RESTRICT,
   ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES public.categories(id) ON DELETE RESTRICT,
+  ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Rice Meals',
   ADD COLUMN IF NOT EXISTS preparation_time_minutes INT DEFAULT 10,
   ADD COLUMN IF NOT EXISTS image_url TEXT,
   ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true;
@@ -877,3 +887,26 @@ SELECT setval('public.categories_id_seq', (SELECT MAX(id) FROM public.categories
 SELECT setval('public.menu_items_id_seq', (SELECT MAX(id) FROM public.menu_items));
 SELECT setval('public.inventory_items_id_seq', (SELECT MAX(id) FROM public.inventory_items));
 SELECT setval('public.menu_item_ingredients_id_seq', (SELECT MAX(id) FROM public.menu_item_ingredients));
+
+-- Supabase Storage bucket for product photos (public URLs are saved in menu_items.image_url).
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'menu-images',
+  'menu-images',
+  true,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "Public can view menu images" ON storage.objects;
+DROP POLICY IF EXISTS "App can upload menu images" ON storage.objects;
+CREATE POLICY "Public can view menu images"
+  ON storage.objects FOR SELECT TO public
+  USING (bucket_id = 'menu-images');
+CREATE POLICY "App can upload menu images"
+  ON storage.objects FOR INSERT TO anon, authenticated
+  WITH CHECK (bucket_id = 'menu-images');

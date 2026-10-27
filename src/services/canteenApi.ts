@@ -8,6 +8,7 @@ import {
   OrderRecord,
   InventoryItem,
   AuditLog,
+  uploadMenuImage,
 } from '../supabase'
 
 export const canteenApi = {
@@ -45,6 +46,9 @@ export const canteenApi = {
 
   // 3. Menu Catalog CRUD Service (Staff Full CRUD)
   menu: {
+    async uploadImage(file: File, stallId: number): Promise<string> {
+      return await uploadMenuImage(file, stallId)
+    },
     async getItems(stallId?: number): Promise<MenuItem[]> {
       return await supabase.getMenuItems(stallId)
     },

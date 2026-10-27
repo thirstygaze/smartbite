@@ -307,18 +307,17 @@ export default function App() {
   })
   const [authStep, setAuthStep] = useState<'welcome' | 'signin' | 'signup'>('welcome')
   const [chosenRole, setChosenRole] = useState<UserRole>('student')
-  const [studentId, setStudentId] = useState('2025-01234')
-  const [password, setPassword] = useState('student123')
+  const [studentId, setStudentId] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [authNotice, setAuthNotice] = useState('')
 
   // Sign up fields (First Name, Middle Name, Last Name)
   const [regFirstName, setRegFirstName] = useState('')
   const [regMiddleName, setRegMiddleName] = useState('')
   const [regLastName, setRegLastName] = useState('')
-  const [regStudentId, setRegStudentId] = useState('')
   const [regDept, setRegDept] = useState('Grade 12 - STEM')
-  const [regPassword, setRegPassword] = useState('')
 
   // Change Password Modal (Available for EVERY account)
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
@@ -334,9 +333,8 @@ export default function App() {
   const [newFirstName, setNewFirstName] = useState('')
   const [newMiddleName, setNewMiddleName] = useState('')
   const [newLastName, setNewLastName] = useState('')
-  const [newUserId, setNewUserId] = useState('')
   const [newDept, setNewDept] = useState('Grade 12 - STEM')
-  const [newPassword, setNewPassword] = useState('user123')
+  const [newPassword, setNewPassword] = useState('')
   const [newStallId, setNewStallId] = useState<number>(1)
   const [newBalance, setNewBalance] = useState<number>(500)
   const [createNewStallCheckbox, setCreateNewStallCheckbox] = useState(false)
@@ -350,12 +348,11 @@ export default function App() {
   const [adminResetUser, setAdminResetUser] = useState<Profile | null>(null)
   const [adminResetNewPwd, setAdminResetNewPwd] = useState('')
 
-  // Admin Edit User Modal (Change Name, First/Middle/Last, ID Number, Role, Dept, Balance, Stall)
+  // Admin Edit User Modal (Change Name, Role, Dept, Balance, Stall)
   const [adminEditUser, setAdminEditUser] = useState<Profile | null>(null)
   const [editFirstName, setEditFirstName] = useState('')
   const [editMiddleName, setEditMiddleName] = useState('')
   const [editLastName, setEditLastName] = useState('')
-  const [editStudentId, setEditStudentId] = useState('')
   const [editRole, setEditRole] = useState<UserRole>('student')
   const [editDept, setEditDept] = useState('')
   const [editBalance, setEditBalance] = useState<number>(0)
@@ -556,7 +553,22 @@ export default function App() {
   const [itemFormStallId, setItemFormStallId] = useState(1)
   const [itemFormPrepTime, setItemFormPrepTime] = useState(10)
   const [itemFormImage, setItemFormImage] = useState('https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
+  const [itemFormImageFile, setItemFormImageFile] = useState<File | null>(null)
+  const [itemFormImagePreview, setItemFormImagePreview] = useState('')
+  const [itemFormError, setItemFormError] = useState('')
+  const [isSavingMenuItem, setIsSavingMenuItem] = useState(false)
   const [itemFormAvailable, setItemFormAvailable] = useState(true)
+
+  useEffect(() => {
+    if (!itemFormImageFile) {
+      setItemFormImagePreview('')
+      return
+    }
+
+    const previewUrl = URL.createObjectURL(itemFormImageFile)
+    setItemFormImagePreview(previewUrl)
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [itemFormImageFile])
 
   // Staff & Admin Inventory Stock Management Modal
   const [stockModalOpen, setStockModalOpen] = useState(false)
@@ -645,19 +657,10 @@ export default function App() {
   // Select Role on Login Page
   const handleSelectRole = (role: UserRole) => {
     setChosenRole(role)
-    if (role === 'student') {
-      setStudentId('2025-01234')
-      setPassword('student123')
-    } else if (role === 'staff') {
-      setStudentId('STAFF-KITCHEN')
-      setPassword('staff123')
-    } else if (role === 'stall_manager') {
-      setStudentId('MGR-BRANCH')
-      setPassword('manager123')
-    } else if (role === 'admin') {
-      setStudentId('ADMIN-DBA')
-      setPassword('admin123')
-    }
+    setStudentId('')
+    setPassword('')
+    setAuthError('')
+    setAuthNotice('')
   }
 
   // Handle Login
@@ -670,26 +673,25 @@ export default function App() {
 
     const profiles = await canteenApi.auth.getProfiles()
     const matched = profiles.find(
-      p => p.student_id.toLowerCase() === studentId.trim().toLowerCase()
+      p =>
+        p.student_id.toLowerCase() === studentId.trim().toLowerCase() ||
+        p.email?.toLowerCase() === studentId.trim().toLowerCase()
     )
 
+    if (!matched) {
+      setAuthError('No account was found for that ID.')
+      return
+    }
+    if (!matched.password) {
+      setAuthError('Your account does not have a password yet. Please contact an administrator.')
+      return
+    }
+    if (matched.password !== password) {
+      setAuthError('The password is incorrect.')
+      return
+    }
+
     const resolvedUser: Profile = matched
-      ? { ...matched, role: chosenRole }
-      : {
-          id: `p-${Date.now()}`,
-          student_id: studentId.trim(),
-          full_name:
-            chosenRole === 'admin'
-              ? 'Engr. David Reyes (Lead DBA)'
-              : chosenRole === 'stall_manager'
-              ? 'Carlos Mendoza (Branch Manager)'
-              : chosenRole === 'staff'
-              ? 'Chef Maria Santos (Kitchen Staff)'
-              : 'Rommel Custodio (Student)',
-          grade_or_dept: chosenRole === 'student' ? 'Grade 12 - STEM A' : 'Campus Canteen Department',
-          role: chosenRole,
-          balance: chosenRole === 'admin' ? 5000 : chosenRole === 'stall_manager' ? 3500 : chosenRole === 'staff' ? 1200 : 500,
-        }
 
     try {
       localStorage.setItem('smartbite_session_user', JSON.stringify(resolvedUser))
@@ -697,6 +699,7 @@ export default function App() {
     setCurrentUser(resolvedUser)
     setLoggedIn(true)
     setAuthError('')
+    setAuthNotice('')
   }
 
   // Handle Sign Up (Uses First Name, Middle Name, Last Name with strict validations)
@@ -713,32 +716,32 @@ export default function App() {
     const lnErr = validateName(regLastName, 'Last Name')
     if (lnErr) { setAuthError(lnErr); return }
 
-    const idErr = validateIdNumber(regStudentId, undefined, userProfiles)
-    if (idErr) { setAuthError(idErr); return }
-
-    const pwdErr = validatePassword(regPassword)
-    if (pwdErr) { setAuthError(pwdErr); return }
-
     const fullName = `${regFirstName.trim()} ${regMiddleName.trim() ? regMiddleName.trim() + ' ' : ''}${regLastName.trim()}`.trim()
 
-    const newProfile = await canteenApi.auth.createProfile({
-      student_id: regStudentId.trim(),
-      first_name: regFirstName.trim(),
-      middle_name: regMiddleName.trim(),
-      last_name: regLastName.trim(),
-      full_name: fullName,
-      grade_or_dept: regDept.trim(),
-      role: 'student',
-      password: regPassword.trim(),
-      balance: 500.0,
-    })
-
     try {
-      localStorage.setItem('smartbite_session_user', JSON.stringify(newProfile))
-    } catch {}
-    setCurrentUser(newProfile)
-    setLoggedIn(true)
+      await canteenApi.auth.createProfile({
+        first_name: regFirstName.trim(),
+        middle_name: regMiddleName.trim(),
+        last_name: regLastName.trim(),
+        full_name: fullName,
+        grade_or_dept: regDept.trim(),
+        role: 'student',
+        balance: 500.0,
+      })
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Could not create your account.')
+      return
+    }
+
+    setRegFirstName('')
+    setRegMiddleName('')
+    setRegLastName('')
+    setRegDept('Grade 12 - STEM')
+    setAuthStep('signin')
+    setStudentId('')
+    setPassword('')
     setAuthError('')
+    setAuthNotice('Account created. An administrator must assign your email, user ID, and password before you can sign in.')
     refreshAllData()
   }
 
@@ -789,9 +792,6 @@ export default function App() {
     const lnErr = validateName(newLastName, 'Last Name')
     if (lnErr) { setAdminUserModalError(lnErr); return }
 
-    const idErr = validateIdNumber(newUserId, undefined, userProfiles)
-    if (idErr) { setAdminUserModalError(idErr); return }
-
     const pwdErr = validatePassword(newPassword)
     if (pwdErr) { setAdminUserModalError(pwdErr); return }
 
@@ -816,7 +816,6 @@ export default function App() {
     const fullName = `${newFirstName.trim()} ${newMiddleName.trim() ? newMiddleName.trim() + ' ' : ''}${newLastName.trim()}`.trim()
 
     await canteenApi.auth.createProfile({
-      student_id: newUserId.trim(),
       first_name: newFirstName.trim(),
       middle_name: newMiddleName.trim(),
       last_name: newLastName.trim(),
@@ -824,20 +823,19 @@ export default function App() {
       grade_or_dept: newDept.trim(),
       role: newRole,
       stall_id: (newRole === 'staff' || newRole === 'stall_manager') ? assignedStallId : undefined,
-      password: newPassword.trim() || 'user123',
+      password: newPassword.trim(),
       balance: Number(newBalance) || (newRole === 'admin' ? 5000 : newRole === 'staff' ? 1200 : 500),
       is_active: true,
     })
 
-    setAdminUserModalSuccess(`✓ Account created successfully for ${fullName} (${newRole})!`)
+    setAdminUserModalSuccess(`✓ Account created for ${fullName} (${newRole}). Assign the email and user ID manually in Supabase.`)
     await refreshAllData()
     setTimeout(() => {
       setAdminCreateUserModalOpen(false)
       setNewFirstName('')
       setNewMiddleName('')
       setNewLastName('')
-      setNewUserId('')
-      setNewPassword('user123')
+      setNewPassword('')
       setCreateNewStallCheckbox(false)
       setNewStallName('')
       setAdminUserModalSuccess('')
@@ -860,7 +858,7 @@ export default function App() {
     setAdminResetNewPwd('')
   }
 
-  // Open Edit User Modal (Change Name, First/Middle/Last, ID Number, Role, Dept, Balance, Stall)
+  // Open Edit User Modal (Change Name, Role, Dept, Balance, Stall)
   const openEditUserModal = (user: Profile) => {
     setAdminEditUser(user)
     let fName = user.first_name || ''
@@ -882,7 +880,6 @@ export default function App() {
     setEditFirstName(fName)
     setEditMiddleName(mName)
     setEditLastName(lName)
-    setEditStudentId(user.student_id)
     setEditRole(user.role)
     setEditDept(user.grade_or_dept || '')
     setEditBalance(user.balance || 0)
@@ -907,9 +904,6 @@ export default function App() {
     const lnErr = validateName(editLastName, 'Last Name')
     if (lnErr) { setEditError(lnErr); return }
 
-    const idErr = validateIdNumber(editStudentId, adminEditUser.id, userProfiles)
-    if (idErr) { setEditError(idErr); return }
-
     const fullName = `${editFirstName.trim()} ${editMiddleName.trim() ? editMiddleName.trim() + ' ' : ''}${editLastName.trim()}`.trim()
 
     const updates: Partial<Profile> = {
@@ -917,7 +911,6 @@ export default function App() {
       middle_name: editMiddleName.trim(),
       last_name: editLastName.trim(),
       full_name: fullName,
-      student_id: editStudentId.trim(),
       role: editRole,
       grade_or_dept: editDept.trim() || 'General',
       balance: Number(editBalance) || 0,
@@ -1138,6 +1131,8 @@ export default function App() {
     setItemFormStallId(Number(item.stall_id) || 1)
     setItemFormPrepTime(Number(item.preparation_time_minutes) || 10)
     setItemFormImage(item.image_url || '')
+    setItemFormImageFile(null)
+    setItemFormError('')
     setItemFormAvailable(Boolean(item.is_available))
     setItemModalOpen(true)
   }
@@ -1151,13 +1146,24 @@ export default function App() {
     setItemFormStallId(typeof defaultStallId === 'number' ? defaultStallId : 1)
     setItemFormPrepTime(10)
     setItemFormImage('https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85')
+    setItemFormImageFile(null)
+    setItemFormError('')
     setItemFormAvailable(true)
     setItemModalOpen(true)
   }
 
   const handleSaveMenuItem = async (e: FormEvent) => {
     e.preventDefault()
+    if (isSavingMenuItem) return
+
+    setItemFormError('')
+    setIsSavingMenuItem(true)
     try {
+      const imageUrl = itemFormImageFile
+        ? await canteenApi.menu.uploadImage(itemFormImageFile, itemFormStallId)
+        : itemFormImage.trim()
+      if (!imageUrl) throw new Error('Choose an image or enter an image URL.')
+
       if (editingItem) {
         const updatedFields: Partial<MenuItem> = {
           name: itemFormName,
@@ -1166,24 +1172,32 @@ export default function App() {
           category: itemFormCategory,
           stall_id: itemFormStallId,
           preparation_time_minutes: itemFormPrepTime,
-          image_url: itemFormImage,
+          image_url: imageUrl,
           is_available: itemFormAvailable,
         }
+        await canteenApi.menu.updateItem(Number(editingItem.id), updatedFields)
         setItems(prev => prev.map(i => (Number(i.id) === Number(editingItem.id) ? { ...i, ...updatedFields } : i)))
-        setItemModalOpen(false)
         setSyncToast(`✓ Updated ${itemFormName}!`)
         setTimeout(() => setSyncToast(''), 2500)
-        await canteenApi.menu.updateItem(Number(editingItem.id), updatedFields)
       } else {
+        const categoryIds: Record<string, number> = {
+          'Rice Meals': 1,
+          Breakfast: 2,
+          Snacks: 3,
+          Drinks: 4,
+        }
         const newItemPayload = {
-          category_id: 1,
+          category_id:
+            items.find(item => item.category === itemFormCategory)?.category_id ??
+            categoryIds[itemFormCategory] ??
+            1,
           name: itemFormName,
           description: itemFormDesc,
           price: itemFormPrice,
           category: itemFormCategory,
           stall_id: itemFormStallId,
           preparation_time_minutes: itemFormPrepTime,
-          image_url: itemFormImage,
+          image_url: imageUrl,
           is_available: itemFormAvailable,
           rating: '4.8',
         }
@@ -1193,9 +1207,13 @@ export default function App() {
         setSyncToast(`✓ Added ${itemFormName} to menu!`)
         setTimeout(() => setSyncToast(''), 2500)
       }
-    } catch (err: any) {
-      console.warn('handleSaveMenuItem notice:', err)
+      setItemFormImageFile(null)
       setItemModalOpen(false)
+    } catch (err) {
+      console.warn('handleSaveMenuItem error:', err)
+      setItemFormError(err instanceof Error ? err.message : 'Could not save product to Supabase.')
+    } finally {
+      setIsSavingMenuItem(false)
     }
   }
 
@@ -1379,7 +1397,7 @@ export default function App() {
                     type="text"
                     value={studentId}
                     onChange={e => setStudentId(e.target.value)}
-                    placeholder="e.g. 2025-01234 or email@hnu.edu.ph"
+                    placeholder="Enter your school email or user ID"
                     required
                   />
                 </div>
@@ -1416,6 +1434,12 @@ export default function App() {
               </div>
 
               {authError && <div className="auth-error-pill">{authError}</div>}
+              {authNotice && (
+                <div className="auth-callout-notice" role="status">
+                  <span className="notice-icon">✳</span>
+                  <span>{authNotice}</span>
+                </div>
+              )}
 
               <button className="auth-btn-primary" type="submit">
                 Sign in <span>&rarr;</span>
@@ -1436,6 +1460,7 @@ export default function App() {
                 onClick={() => {
                   setAuthStep('signup')
                   setAuthError('')
+                  setAuthNotice('')
                 }}
               >
                 Create an account
@@ -1455,6 +1480,7 @@ export default function App() {
             onClick={() => {
               setAuthStep('signin')
               setAuthError('')
+              setAuthNotice('')
             }}
           >
             <span>&larr;</span> Back to sign in
@@ -1465,7 +1491,7 @@ export default function App() {
               <span className="sparkle">✳</span> NEW STUDENT REGISTRATION
             </span>
             <h1>Create an account.</h1>
-            <p>Join Smartbite to order lunch ahead and skip the campus line.</p>
+            <p>Join Smartbite to order lunch ahead and skip the campus line. An administrator will assign your email, user ID, and password.</p>
           </div>
 
           <form onSubmit={handleSignUp}>
@@ -1502,22 +1528,6 @@ export default function App() {
             </div>
 
             <div className="auth-field">
-              <span className="auth-field-label">Student ID Number</span>
-              <div className="auth-input-box" style={{ marginTop: '7px' }}>
-                <input
-                  value={regStudentId}
-                  onChange={e => setRegStudentId(e.target.value.replace(/\D/g, ''))}
-                  placeholder="e.g. 20250123"
-                  maxLength={12}
-                  required
-                />
-              </div>
-              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                Numbers only (digits 0-9, unique ID, cannot be all the same repeating digit)
-              </small>
-            </div>
-
-            <div className="auth-field">
               <span className="auth-field-label">Grade Level / Department</span>
               <div className="auth-input-box" style={{ marginTop: '7px' }}>
                 <input
@@ -1529,34 +1539,15 @@ export default function App() {
               </div>
             </div>
 
-            <div className="auth-field">
-              <span className="auth-field-label">Password</span>
-              <div className="auth-input-box" style={{ marginTop: '7px' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={regPassword}
-                  onChange={e => setRegPassword(e.target.value.replace(/\s/g, ''))}
-                  placeholder="Choose password (min 6 chars)"
-                  required
-                />
-                <button
-                  type="button"
-                  className="auth-toggle-pwd"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                >
-                  <Icon name={showPassword ? 'eye-off' : 'eye'} size={17} />
-                </button>
-              </div>
-              <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                Must mix letters and numbers &bull; No spaces allowed
-              </small>
+            <div className="auth-callout-notice" role="note">
+              <span className="notice-icon">✳</span>
+              <span>After creating your account, contact a canteen administrator to assign your email, user ID, and password.</span>
             </div>
 
             {authError && <div className="auth-error-pill">{authError}</div>}
 
             <button className="auth-btn-primary" type="submit">
-              Create account &amp; enter <span>&rarr;</span>
+              Create account <span>&rarr;</span>
             </button>
           </form>
 
@@ -1567,6 +1558,7 @@ export default function App() {
               onClick={() => {
                 setAuthStep('signin')
                 setAuthError('')
+                setAuthNotice('')
               }}
             >
               Sign in
@@ -2530,6 +2522,7 @@ export default function App() {
                         className="auth-btn-primary"
                         onClick={() => {
                           setAdminCreateUserModalOpen(true)
+                          setNewPassword('')
                           setAdminUserModalError('')
                           setAdminUserModalSuccess('')
                         }}
@@ -2568,6 +2561,7 @@ export default function App() {
                       <thead>
                         <tr>
                           <th>User ID</th>
+                          <th>Email</th>
                           <th>Full Name (First, Middle, Last)</th>
                           <th>Role Tier</th>
                           <th>Assigned Stall</th>
@@ -2583,12 +2577,14 @@ export default function App() {
                             const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter
                             const matchQuery =
                               u.full_name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-                              u.student_id.toLowerCase().includes(userSearchQuery.toLowerCase())
+                              u.student_id.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                              (u.email || '').toLowerCase().includes(userSearchQuery.toLowerCase())
                             return matchRole && matchQuery
                           })
                           .map(user => (
                             <tr key={user.id}>
                               <td><code>{user.student_id}</code></td>
+                              <td>{user.email || <span style={{ color: 'var(--muted)' }}>Not assigned</span>}</td>
                               <td>
                                 <strong>{user.full_name}</strong>
                                 <small style={{ display: 'block', color: 'var(--muted)', fontSize: '11px' }}>
@@ -2670,7 +2666,7 @@ export default function App() {
                                     className="btn-secondary"
                                     onClick={() => openEditUserModal(user)}
                                     style={{ padding: '3px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--primary)', fontWeight: 700 }}
-                                    title="Edit User Name, ID Number, Role, and Details"
+                                    title="Edit user name, role, and details"
                                   >
                                     <Icon name="edit" size={12} />
                                     <span>Edit</span>
@@ -2733,9 +2729,9 @@ export default function App() {
                   <span className="eyebrow-chip">
                     <span className="sparkle">✳</span> KITCHEN STAFF OPERATIONS &amp; CRUD PANEL
                   </span>
-                  <h1>Kitchen Display &amp; Canteen CRUD Authority</h1>
-                  <p>You have full authority to edit menu items, update prices, restock ingredients, and manage tickets.</p>
-                  
+                  <h1>Kitchen Display</h1>
+                  <p></p>
+
                   {/* Stall handles many staff users */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-light)', padding: '8px 14px', borderRadius: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
                     <Icon name="store" size={16} />
@@ -2785,7 +2781,7 @@ export default function App() {
                   <div className="card-panel-header">
                     <div>
                       <h3>Live Kitchen  Queue</h3>
-                      <p>Orders awaiting cooking, prep, and counter pickup</p>
+                      <p></p>
                     </div>
                     <button className="btn-secondary" onClick={refreshAllData}>
                       <Icon name="refresh" size={14} /> Refresh Queue
@@ -2889,7 +2885,7 @@ export default function App() {
                   <div className="card-panel-header">
                     <div>
                       <h3>Menu Catalog Manager</h3>
-                      <p>You can create new food items, adjust prices, and toggle availability</p>
+                      <p></p>
                     </div>
                     <button className="btn-secondary" onClick={openCreateModal}>
                       <Icon name="plus" size={14} /> Add New Dish
@@ -2978,7 +2974,7 @@ export default function App() {
                   <div className="card-panel-header">
                     <div>
                       <h3>Ingredient Stock  &amp; Thresholds</h3>
-                      <p>Monitor raw ingredient levels and trigger restock operations</p>
+
                     </div>
                     <button className="btn-secondary" onClick={refreshAllData}>
                       <Icon name="refresh" size={14} /> Refresh Balances
@@ -3745,7 +3741,7 @@ export default function App() {
                     <span className="sparkle">✳</span> STUDENT MEAL PORTAL
                   </span>
                   <h1>Good day, {currentUser.full_name}!</h1>
-                  <p>Browse campus stalls, order ahead, and skip the line.</p>
+
                 </div>
                 <div className="status-pill-open">
                   <span>Balance:</span>
@@ -4191,14 +4187,15 @@ export default function App() {
           STAFF CRUD MODAL (ADD / EDIT FOOD DISH)
           ===================================================================== */}
       {itemModalOpen && (
-        <div className="crud-modal-overlay" onMouseDown={() => setItemModalOpen(false)}>
+        <div className="crud-modal-overlay" onMouseDown={() => !isSavingMenuItem && setItemModalOpen(false)}>
           <div className="crud-modal" onMouseDown={e => e.stopPropagation()}>
             <div className="crud-modal-header">
               <h3>{editingItem ? 'Edit Food Item' : 'Add New Food Item'}</h3>
               <button
                 className="icon-action-btn"
                 style={{ width: '32px', height: '32px' }}
-                onClick={() => setItemModalOpen(false)}
+                onClick={() => !isSavingMenuItem && setItemModalOpen(false)}
+                disabled={isSavingMenuItem}
               >
                 <Icon name="x" size={16} />
               </button>
@@ -4270,12 +4267,45 @@ export default function App() {
                   </div>
                 </div>
                 <div className="crud-form-group">
-                  <label>Photo URL</label>
+                  <label htmlFor="item-image-file">Upload product photo</label>
                   <input
+                    id="item-image-file"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                    onChange={e => setItemFormImageFile(e.target.files?.[0] || null)}
+                  />
+                  <small>JPG, PNG, WebP, GIF, or AVIF. Maximum file size: 5 MB.</small>
+                  {(itemFormImagePreview || itemFormImage) && (
+                    <img
+                      key={itemFormImagePreview || itemFormImage}
+                      className="menu-image-preview"
+                      src={itemFormImagePreview || itemFormImage}
+                      alt="Product image preview"
+                      onError={e => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  )}
+                  <label htmlFor="item-image-url">Or use an image URL</label>
+                  <input
+                    id="item-image-url"
+                    type="url"
                     value={itemFormImage}
                     onChange={e => setItemFormImage(e.target.value)}
+                    disabled={Boolean(itemFormImageFile)}
+                    placeholder="https://example.com/image.jpg"
                   />
+                  {itemFormImageFile && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setItemFormImageFile(null)}
+                    >
+                      Remove selected photo
+                    </button>
+                  )}
                 </div>
+                {itemFormError && <p className="toast-error" role="alert">{itemFormError}</p>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
                     type="checkbox"
@@ -4292,12 +4322,17 @@ export default function App() {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setItemModalOpen(false)}
+                  onClick={() => !isSavingMenuItem && setItemModalOpen(false)}
+                  disabled={isSavingMenuItem}
                 >
                   Cancel
                 </button>
-                <button className="auth-btn-primary" type="submit" style={{ width: 'auto', padding: '0 20px', height: '40px', fontSize: '13px' }}>
-                  {editingItem ? 'Save Updates' : 'Add Dish'}
+                <button className="auth-btn-primary" type="submit" disabled={isSavingMenuItem} style={{ width: 'auto', padding: '0 20px', height: '40px', fontSize: '13px' }}>
+                  {isSavingMenuItem
+                    ? 'Uploading & saving…'
+                    : editingItem
+                      ? 'Save Updates'
+                      : 'Add Dish'}
                 </button>
               </div>
             </form>
@@ -4428,6 +4463,9 @@ export default function App() {
               <div className="crud-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 {adminUserModalError && <div className="toast-error">{adminUserModalError}</div>}
                 {adminUserModalSuccess && <div className="toast-success">{adminUserModalSuccess}</div>}
+                <p className="auth-callout-notice" role="note">
+                  Email and user ID are assigned manually in Supabase after account creation.
+                </p>
 
                 {/* Role Selector Tabs */}
                 <div className="crud-form-group">
@@ -4498,26 +4536,6 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="crud-form-group">
-                    <label>
-                      {newRole === 'student'
-                        ? 'Student ID Number'
-                        : newRole === 'staff'
-                        ? 'Staff Employee ID'
-                        : newRole === 'stall_manager'
-                        ? 'Stall Manager ID'
-                        : 'Admin ID'}
-                    </label>
-                    <input
-                      placeholder="e.g. 202509876"
-                      value={newUserId}
-                      onChange={e => setNewUserId(e.target.value.replace(/\D/g, ''))}
-                      required
-                    />
-                    <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
-                      Numbers only (unique, not all repeating digits).
-                    </small>
-                  </div>
                   <div className="crud-form-group">
                     <label>Department / Grade</label>
                     <input
@@ -4738,7 +4756,7 @@ export default function App() {
               <div>
                 <span className="sidebar-section-kicker" style={{ margin: 0, color: 'var(--primary)', paddingLeft: 0 }}>ADMINISTRATION PORTAL</span>
                 <h3 style={{ margin: '2px 0 0', fontSize: '20px', fontFamily: 'var(--font-serif)' }}>
-                  Edit User Details & ID Number
+                  Edit User Details
                 </h3>
                 <small style={{ color: 'var(--muted)' }}>
                   Modifying user profile for {adminEditUser.full_name} ({adminEditUser.student_id})
@@ -4758,6 +4776,9 @@ export default function App() {
               <div className="crud-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 {editError && <div className="toast-error">{editError}</div>}
                 {editSuccess && <div className="toast-success">{editSuccess}</div>}
+                <p className="auth-callout-notice" role="note">
+                  Email and user ID are managed manually in Supabase and cannot be changed here.
+                </p>
 
                 {/* Role Selector Tabs */}
                 <div className="crud-form-group">
@@ -4828,26 +4849,6 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="crud-form-group">
-                    <label>
-                      {editRole === 'student'
-                        ? 'Student ID Number *'
-                        : editRole === 'staff'
-                        ? 'Staff Employee ID *'
-                        : editRole === 'stall_manager'
-                        ? 'Stall Manager ID *'
-                        : 'Admin ID *'}
-                    </label>
-                    <input
-                      placeholder="e.g. 202501234 or 10025"
-                      value={editStudentId}
-                      onChange={e => setEditStudentId(e.target.value.replace(/\D/g, ''))}
-                      required
-                    />
-                    <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '3px', display: 'block' }}>
-                      Numbers only (unique, not all repeating digits).
-                    </small>
-                  </div>
                   <div className="crud-form-group">
                     <label>Department / Grade</label>
                     <input
@@ -4935,7 +4936,7 @@ export default function App() {
 
             <div className="crud-modal-body">
               <span className="sidebar-section-kicker" style={{ margin: 0, paddingLeft: 0 }}>AVAILABLE UNIVERSITY CAMPUSES</span>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {campuses.map(c => (
                   <div
