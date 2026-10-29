@@ -2717,12 +2717,10 @@ export default function App() {
                           lineHeight: "1.5",
                         }}
                       >
-                        Enter the school email associated with your account. A
-                        6-digit verification code will be sent to confirm your
-                        identity.
+                        Enter the  email
                       </p>
                       <div className="crud-form-group">
-                        <label>Registered School Email</label>
+                        <label>Registered  Email</label>
                         <input
                           type="email"
                           value={forgotEmail}
