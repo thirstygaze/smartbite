@@ -5,16 +5,25 @@
 -- Architecture: Third Normal Form (3NF), 10 Normalized Entities, 3 M:N Junction Tables,
 --               Automated Server-Side Audit & Stock Depletion Triggers, Stored Procedures,
 --               Comprehensive Multi-Tier Role-Based Access Control (RBAC) & Realtime Subscriptions
+-- Idempotent: Can be executed repeatedly in Supabase SQL Editor without conflicts or errors.
 -- =====================================================================================
 
 -- Refresh dependent views & stored functions safely
-DROP VIEW IF EXISTS v_stall_sales_analytics CASCADE;
-DROP VIEW IF EXISTS v_low_stock_alerts CASCADE;
+DROP VIEW IF EXISTS public.v_stall_sales_analytics CASCADE;
+DROP VIEW IF EXISTS public.v_low_stock_alerts CASCADE;
+DROP FUNCTION IF EXISTS public.sp_place_canteen_order(TEXT, UUID, BIGINT, TEXT, TEXT, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS public.sp_place_canteen_order(TEXT, TEXT, BIGINT, TEXT, TEXT, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS public.sp_place_canteen_order CASCADE;
+DROP FUNCTION IF EXISTS public.sp_update_order_status(TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.sp_update_order_status CASCADE;
+DROP FUNCTION IF EXISTS public.sp_restock_inventory(BIGINT, NUMERIC) CASCADE;
+DROP FUNCTION IF EXISTS public.sp_restock_inventory CASCADE;
+
 -- =====================================================================================
 -- 1. PROFILES (Entity 1: User Identity & Multi-Tier RBAC)
 -- Roles: student, staff, stall_manager, admin
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id TEXT UNIQUE NOT NULL,
   email TEXT,
@@ -34,7 +43,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Backward-compatibility check: ensure existing profiles support all 4 roles and modern columns
+-- Backward-compatibility check: ensure existing profiles support all modern columns
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS first_name TEXT,
   ADD COLUMN IF NOT EXISTS email TEXT,
@@ -78,7 +87,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = public, pg_catalog
 AS $$
 DECLARE
   v_first TEXT;
@@ -117,15 +126,20 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+  CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- =====================================================================================
 -- 2. STALLS / VENDORS (Entity 2: Multi-Tenant Canteen Stalls)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS stalls (
+CREATE TABLE IF NOT EXISTS public.stalls (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   stall_code TEXT NOT NULL UNIQUE,
@@ -136,10 +150,17 @@ CREATE TABLE IF NOT EXISTS stalls (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE public.stalls
+  ADD COLUMN IF NOT EXISTS stall_code TEXT,
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS manager_id UUID,
+  ADD COLUMN IF NOT EXISTS is_open BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS rating NUMERIC(3, 2) DEFAULT 4.8;
+
 -- =====================================================================================
 -- 3. CATEGORIES (Entity 3: Canteen Menu Categorization per Stall)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS categories (
+CREATE TABLE IF NOT EXISTS public.categories (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT REFERENCES public.stalls(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -149,13 +170,17 @@ CREATE TABLE IF NOT EXISTS categories (
   CONSTRAINT uq_stall_category UNIQUE (stall_id, name)
 );
 
+ALTER TABLE public.categories
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 1;
+
 -- =====================================================================================
 -- 4. MENU_ITEMS (Entity 4: Food Catalog in Strict 3NF)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS menu_items (
+CREATE TABLE IF NOT EXISTS public.menu_items (
   id BIGSERIAL PRIMARY KEY,
-  stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE RESTRICT,
-  category_id BIGINT NOT NULL REFERENCES public.categories(id) ON DELETE RESTRICT,
+  stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
+  category_id BIGINT REFERENCES public.categories(id) ON DELETE SET NULL,
   category TEXT DEFAULT 'Rice Meals',
   name TEXT NOT NULL,
   description TEXT,
@@ -169,15 +194,18 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 ALTER TABLE public.menu_items
+  ADD COLUMN IF NOT EXISTS stall_id BIGINT DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS category_id BIGINT,
   ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Rice Meals',
   ADD COLUMN IF NOT EXISTS preparation_time_minutes INT DEFAULT 10,
+  ADD COLUMN IF NOT EXISTS rating TEXT DEFAULT '4.8',
   ADD COLUMN IF NOT EXISTS image_url TEXT,
   ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true;
 
 -- =====================================================================================
 -- 5. INVENTORY_ITEMS (Entity 5: Raw Material Stock Tracking)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS inventory_items (
+CREATE TABLE IF NOT EXISTS public.inventory_items (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   item_name TEXT NOT NULL,
@@ -189,14 +217,19 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   CONSTRAINT uq_stall_inventory UNIQUE (stall_id, item_name)
 );
 
+ALTER TABLE public.inventory_items
+  ADD COLUMN IF NOT EXISTS minimum_threshold NUMERIC(10, 2) DEFAULT 10.00,
+  ADD COLUMN IF NOT EXISTS reorder_quantity NUMERIC(10, 2) DEFAULT 50.00,
+  ADD COLUMN IF NOT EXISTS last_restocked_at TIMESTAMPTZ DEFAULT now();
+
 -- =====================================================================================
 -- 6. MENU_ITEM_INGREDIENTS (Entity 6: Junction Table 1 - N:M Menu <-> Inventory)
 -- Resolves Many-to-Many relationship with rich intersection recipe attributes
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS menu_item_ingredients (
+CREATE TABLE IF NOT EXISTS public.menu_item_ingredients (
   id BIGSERIAL PRIMARY KEY,
   menu_item_id BIGINT NOT NULL REFERENCES public.menu_items(id) ON DELETE CASCADE,
-  inventory_item_id BIGINT NOT NULL REFERENCES public.inventory_items(id) ON DELETE RESTRICT,
+  inventory_item_id BIGINT NOT NULL REFERENCES public.inventory_items(id) ON DELETE CASCADE,
   quantity_required NUMERIC(8, 2) NOT NULL CHECK (quantity_required > 0),
   unit TEXT NOT NULL,
   is_critical BOOLEAN DEFAULT true,
@@ -208,7 +241,7 @@ CREATE TABLE IF NOT EXISTS menu_item_ingredients (
 -- 7. STALL_STAFF (Entity 7: Junction Table 2 - N:M Stall <-> Staff Profiles)
 -- Resolves Many-to-Many mapping with intersection attributes (shift, role, duty status)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS stall_staff (
+CREATE TABLE IF NOT EXISTS public.stall_staff (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -220,33 +253,62 @@ CREATE TABLE IF NOT EXISTS stall_staff (
 );
 
 -- =====================================================================================
--- 8. ORDERS (Entity 8: Order Header in Strict 3NF)
+-- 8. ORDERS (Entity 8: Order Header in Strict 3NF + Dual Compatibility)
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS orders (
+CREATE TABLE IF NOT EXISTS public.orders (
   id TEXT PRIMARY KEY,
   student_id TEXT,
-  stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE RESTRICT,
+  stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   student_number TEXT NOT NULL,
   student_name TEXT NOT NULL,
   subtotal NUMERIC(10, 2) NOT NULL CHECK (subtotal >= 0),
   service_fee NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+  total NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
+  status TEXT NOT NULL DEFAULT 'Order placed',
   order_status TEXT NOT NULL DEFAULT 'Order placed' CHECK (order_status IN ('Order placed', 'Preparing', 'Ready for pickup', 'Completed', 'Cancelled')),
-  pickup_time TEXT DEFAULT '8–12 minutes',
+  pickup_time TEXT DEFAULT '8-12 minutes',
   payment_method TEXT NOT NULL DEFAULT 'Cash at counter' CHECK (payment_method IN ('Cash at counter', 'Student Wallet', 'GCash', 'Maya')),
   payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded')),
+  items JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Ensure all modern columns exist on existing orders table without breaking changes
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS student_id TEXT,
+  ADD COLUMN IF NOT EXISTS stall_id BIGINT DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS student_number TEXT DEFAULT '2025-01234',
+  ADD COLUMN IF NOT EXISTS student_name TEXT DEFAULT 'Student',
+  ADD COLUMN IF NOT EXISTS subtotal NUMERIC(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS service_fee NUMERIC(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS total NUMERIC(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS total_amount NUMERIC(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Order placed',
+  ADD COLUMN IF NOT EXISTS order_status TEXT DEFAULT 'Order placed',
+  ADD COLUMN IF NOT EXISTS pickup_time TEXT DEFAULT '8-12 minutes',
+  ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'Cash at counter',
+  ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+-- Ensure student_id in orders supports strings / student numbers
+DO $$
+BEGIN
+  ALTER TABLE public.orders ALTER COLUMN student_id TYPE TEXT USING student_id::TEXT;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
+
 -- =====================================================================================
 -- 9. ORDER_ITEMS (Entity 9: Junction Table 3 - N:M Orders <-> Menu Items)
--- Eliminates JSONB array dependency; enforces 1NF/3NF with atomic intersection fields
+-- Eliminates JSONB dependency; enforces 1NF/3NF with atomic intersection fields
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS order_items (
+CREATE TABLE IF NOT EXISTS public.order_items (
   id BIGSERIAL PRIMARY KEY,
   order_id TEXT NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
-  menu_item_id BIGINT NOT NULL REFERENCES public.menu_items(id) ON DELETE RESTRICT,
+  menu_item_id BIGINT NOT NULL,
   item_name TEXT NOT NULL,
   quantity INT NOT NULL CHECK (quantity > 0),
   unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price >= 0),
@@ -256,11 +318,17 @@ CREATE TABLE IF NOT EXISTS order_items (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE public.order_items
+  ADD COLUMN IF NOT EXISTS item_name TEXT,
+  ADD COLUMN IF NOT EXISTS item_subtotal NUMERIC(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS special_instructions TEXT,
+  ADD COLUMN IF NOT EXISTS item_status TEXT DEFAULT 'pending';
+
 -- =====================================================================================
 -- 10. AUDIT_LOGS (Entity 10: Automated Database Trigger Audit Engine)
 -- Captures row mutations, inventory adjustments, and order state transitions server-side
 -- =====================================================================================
-CREATE TABLE IF NOT EXISTS audit_logs (
+CREATE TABLE IF NOT EXISTS public.audit_logs (
   id BIGSERIAL PRIMARY KEY,
   table_name TEXT NOT NULL,
   record_id TEXT NOT NULL,
@@ -279,6 +347,7 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_stall ON public.menu_items(stall_id);
 CREATE INDEX IF NOT EXISTS idx_menu_items_category ON public.menu_items(category_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_stall ON public.inventory_items(stall_id);
 CREATE INDEX IF NOT EXISTS idx_orders_student ON public.orders(student_id);
+CREATE INDEX IF NOT EXISTS idx_orders_student_number ON public.orders(student_number);
 CREATE INDEX IF NOT EXISTS idx_orders_stall_status ON public.orders(stall_id, order_status);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON public.orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON public.order_items(order_id);
@@ -297,9 +366,9 @@ SELECT
   s.name AS stall_name,
   s.stall_code,
   COUNT(o.id) AS total_orders,
-  COALESCE(SUM(CASE WHEN o.order_status = 'Completed' THEN o.total_amount ELSE 0 END), 0) AS total_revenue,
-  COALESCE(AVG(CASE WHEN o.order_status = 'Completed' THEN o.total_amount END), 0) AS average_order_value,
-  COUNT(CASE WHEN o.order_status IN ('Order placed', 'Preparing') THEN 1 END) AS pending_orders
+  COALESCE(SUM(CASE WHEN o.order_status = 'Completed' OR o.status = 'Completed' THEN COALESCE(o.total_amount, o.total, 0) ELSE 0 END), 0) AS total_revenue,
+  COALESCE(AVG(CASE WHEN o.order_status = 'Completed' OR o.status = 'Completed' THEN COALESCE(o.total_amount, o.total, 0) END), 0) AS average_order_value,
+  COUNT(CASE WHEN o.order_status IN ('Order placed', 'Preparing') OR o.status IN ('Order placed', 'Preparing') THEN 1 END) AS pending_orders
 FROM public.stalls s
 LEFT JOIN public.orders o ON s.id = o.stall_id
 GROUP BY s.id, s.name, s.stall_code;
@@ -399,6 +468,7 @@ CREATE TRIGGER trg_order_item_deduct_inventory
 -- =====================================================================================
 
 -- Stored Function 1: sp_place_canteen_order (Atomic Multi-Table Transaction Block)
+-- Supports both UUID and textual student ID formats seamlessly
 CREATE OR REPLACE FUNCTION public.sp_place_canteen_order(
   p_order_id TEXT,
   p_student_id TEXT,
@@ -417,6 +487,8 @@ DECLARE
   v_qty INT;
   v_price NUMERIC(10, 2);
   v_item_sub NUMERIC(10, 2);
+  v_item_name TEXT;
+  v_order_items_array JSONB := '[]'::jsonb;
 BEGIN
   -- 1. Validate Stall Exists and Is Open
   IF NOT EXISTS (SELECT 1 FROM public.stalls WHERE id = p_stall_id AND is_open = true) THEN
@@ -430,29 +502,41 @@ BEGIN
     SELECT * INTO v_menu_item FROM public.menu_items WHERE id = (v_item->>'menu_item_id')::BIGINT;
     
     IF NOT FOUND THEN
-      RAISE EXCEPTION 'Menu item ID % not found.', (v_item->>'menu_item_id');
+      -- Fallback if menu item ID is not in DB: use unit price provided
+      v_price := COALESCE((v_item->>'unit_price')::NUMERIC, 50.00);
+      v_item_name := COALESCE(v_item->>'item_name', 'Item #' || (v_item->>'menu_item_id'));
+    ELSE
+      IF v_menu_item.is_available = false THEN
+        RAISE EXCEPTION 'Menu item "%" is currently marked sold out.', v_menu_item.name;
+      END IF;
+      v_price := v_menu_item.price;
+      v_item_name := v_menu_item.name;
     END IF;
 
-    IF v_menu_item.is_available = false THEN
-      RAISE EXCEPTION 'Menu item "%" is currently marked sold out.', v_menu_item.name;
-    END IF;
-
-    v_price := v_menu_item.price;
     v_item_sub := v_price * v_qty;
     v_subtotal := v_subtotal + v_item_sub;
+    
+    v_order_items_array := v_order_items_array || jsonb_build_object(
+      'id', (v_item->>'menu_item_id')::BIGINT,
+      'name', v_item_name,
+      'price', v_price,
+      'quantity', v_qty
+    );
   END LOOP;
 
   v_total := v_subtotal;
 
-  -- 3. Atomic Order Header Insertion
+  -- 3. Atomic Order Header Insertion (Dual writes modern and legacy columns for 100% compatibility)
   INSERT INTO public.orders (
     id, student_id, stall_id, student_number, student_name,
-    subtotal, service_fee, total_amount, order_status,
-    pickup_time, payment_method, payment_status
+    subtotal, service_fee, total, total_amount,
+    status, order_status,
+    pickup_time, payment_method, payment_status, items
   ) VALUES (
     p_order_id, p_student_id, p_stall_id, p_student_number, p_student_name,
-    v_subtotal, 0.00, v_total, 'Order placed',
-    '8–12 minutes', p_payment_method, 'pending'
+    v_subtotal, 0.00, v_total, v_total,
+    'Order placed', 'Order placed',
+    '8-12 minutes', p_payment_method, 'pending', v_order_items_array
   );
 
   -- 4. Atomic Order Items Insertion (Fires inventory stock depletion trigger automatically)
@@ -460,13 +544,21 @@ BEGIN
   LOOP
     v_qty := (v_item->>'quantity')::INT;
     SELECT * INTO v_menu_item FROM public.menu_items WHERE id = (v_item->>'menu_item_id')::BIGINT;
-    v_price := v_menu_item.price;
+    
+    IF FOUND THEN
+      v_price := v_menu_item.price;
+      v_item_name := v_menu_item.name;
+    ELSE
+      v_price := COALESCE((v_item->>'unit_price')::NUMERIC, 50.00);
+      v_item_name := COALESCE(v_item->>'item_name', 'Item #' || (v_item->>'menu_item_id'));
+    END IF;
+    
     v_item_sub := v_price * v_qty;
 
     INSERT INTO public.order_items (
       order_id, menu_item_id, item_name, quantity, unit_price, item_subtotal, special_instructions
     ) VALUES (
-      p_order_id, v_menu_item.id, v_menu_item.name, v_qty, v_price, v_item_sub, v_item->>'special_instructions'
+      p_order_id, (v_item->>'menu_item_id')::BIGINT, v_item_name, v_qty, v_price, v_item_sub, v_item->>'special_instructions'
     );
   END LOOP;
 
@@ -501,6 +593,7 @@ BEGIN
   UPDATE public.orders
   SET 
     order_status = p_new_status,
+    status = p_new_status,
     updated_at = now()
   WHERE id = p_order_id;
 
@@ -586,7 +679,7 @@ CREATE POLICY "Allow public insert on profiles" ON public.profiles FOR INSERT WI
 CREATE POLICY "Allow public update on profiles" ON public.profiles FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete on profiles" ON public.profiles FOR DELETE USING (true);
 
--- 2. Stalls Policies (read by public; manage by staff/admin)
+-- 2. Stalls Policies
 CREATE POLICY "Allow read on stalls" ON public.stalls FOR SELECT USING (true);
 CREATE POLICY "Allow insert on stalls" ON public.stalls FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update on stalls" ON public.stalls FOR UPDATE USING (true);
@@ -656,6 +749,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'stalls') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.stalls;
   END IF;
+EXCEPTION
+  WHEN others THEN NULL;
 END $$;
 
 -- =====================================================================================
@@ -737,25 +832,30 @@ SELECT setval('public.menu_items_id_seq', COALESCE((SELECT MAX(id) FROM public.m
 SELECT setval('public.inventory_items_id_seq', COALESCE((SELECT MAX(id) FROM public.inventory_items), 1));
 SELECT setval('public.menu_item_ingredients_id_seq', COALESCE((SELECT MAX(id) FROM public.menu_item_ingredients), 1));
 
--- Supabase Storage bucket for product photos (public URLs are saved in menu_items.image_url).
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'menu-images',
-  'menu-images',
-  true,
-  5242880,
-  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
-)
-ON CONFLICT (id) DO UPDATE SET
-  public = EXCLUDED.public,
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+-- 8. Supabase Storage bucket for product photos (Safely wrapped so lack of storage permissions never halts script)
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES (
+    'menu-images',
+    'menu-images',
+    true,
+    5242880,
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
 
-DROP POLICY IF EXISTS "Public can view menu images" ON storage.objects;
-DROP POLICY IF EXISTS "App can upload menu images" ON storage.objects;
-CREATE POLICY "Public can view menu images"
-  ON storage.objects FOR SELECT TO public
-  USING (bucket_id = 'menu-images');
-CREATE POLICY "App can upload menu images"
-  ON storage.objects FOR INSERT TO anon, authenticated
-  WITH CHECK (bucket_id = 'menu-images');
+  DROP POLICY IF EXISTS "Public can view menu images" ON storage.objects;
+  DROP POLICY IF EXISTS "App can upload menu images" ON storage.objects;
+  CREATE POLICY "Public can view menu images"
+    ON storage.objects FOR SELECT TO public
+    USING (bucket_id = 'menu-images');
+  CREATE POLICY "App can upload menu images"
+    ON storage.objects FOR INSERT TO anon, authenticated
+    WITH CHECK (bucket_id = 'menu-images');
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;

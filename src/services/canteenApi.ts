@@ -9,7 +9,9 @@ import {
   InventoryItem,
   AuditLog,
   uploadMenuImage,
-} from '../supabase'
+  sendEmailVerificationCode,
+  verifyEmailCode,
+} from "../supabase"
 
 export const canteenApi = {
   // 1. Auth & Profiles Service (Admin User Management)
@@ -23,11 +25,26 @@ export const canteenApi = {
     async updateProfile(id: string, updates: Partial<Profile>): Promise<void> {
       return await supabase.updateProfile(id, updates)
     },
-    async deleteProfile(id: string): Promise<void> {
-      return await supabase.deleteProfile(id)
+    async deleteProfile(id: string, studentId?: string): Promise<void> {
+      return await supabase.deleteProfile(id, studentId)
     },
-    async changePassword(profileId: string, newPassword: string): Promise<boolean> {
+    async changePassword(
+      profileId: string,
+      newPassword: string,
+    ): Promise<boolean> {
       return await supabase.changePassword(profileId, newPassword)
+    },
+    async sendVerificationCode(email: string): Promise<{
+      ok: boolean
+      message: string
+    }> {
+      return await sendEmailVerificationCode(email)
+    },
+    async verifyEmailCode(email: string, token: string): Promise<{
+      ok: boolean
+      error?: string
+    }> {
+      return await verifyEmailCode(email, token)
     },
   },
 
@@ -36,7 +53,7 @@ export const canteenApi = {
     async getStalls(): Promise<Stall[]> {
       return await supabase.getStalls()
     },
-    async createStall(stall: Omit<Stall, 'id'>): Promise<Stall> {
+    async createStall(stall: Omit<Stall, "id">): Promise<Stall> {
       return await supabase.createStall(stall)
     },
     async updateStall(id: number, updates: Partial<Stall>): Promise<void> {
@@ -52,7 +69,7 @@ export const canteenApi = {
     async getItems(stallId?: number): Promise<MenuItem[]> {
       return await supabase.getMenuItems(stallId)
     },
-    async createItem(item: Omit<MenuItem, 'id'>): Promise<MenuItem> {
+    async createItem(item: Omit<MenuItem, "id">): Promise<MenuItem> {
       return await supabase.createMenuItem(item)
     },
     async updateItem(id: number, updates: Partial<MenuItem>): Promise<void> {
@@ -68,7 +85,7 @@ export const canteenApi = {
     async list(stallId?: number): Promise<InventoryItem[]> {
       return await supabase.getInventory(stallId)
     },
-    async create(item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> {
+    async create(item: Omit<InventoryItem, "id">): Promise<InventoryItem> {
       return await supabase.createInventoryItem(item)
     },
     async update(id: number, updates: Partial<InventoryItem>): Promise<void> {
@@ -92,21 +109,35 @@ export const canteenApi = {
         student_number: string
         student_name: string
         payment_method: string
+        payment_status?: "pending" | "paid" | "refunded"
       },
       items: Array<{
         menu_item_id: number
         quantity: number
         unit_price: number
         special_instructions?: string
-      }>
+        item_status?: "pending" | "cooking" | "prepared"
+      }>,
     ): Promise<any> {
       return await supabase.placeOrder(header, items)
     },
-    async list(options?: { studentNumber?: string; stallId?: number }): Promise<OrderRecord[]> {
+    async list(options?: {
+      studentNumber?: string
+      stallId?: number
+    }): Promise<OrderRecord[]> {
       return await supabase.getOrders(options)
     },
-    async updateStatus(orderId: string, newStatus: OrderRecord['order_status']): Promise<void> {
+    async updateStatus(
+      orderId: string,
+      newStatus: OrderRecord["order_status"],
+    ): Promise<void> {
       return await supabase.updateOrderStatus(orderId, newStatus)
+    },
+    async updatePaymentStatus(
+      orderId: string,
+      paymentStatus: "paid" | "pending",
+    ): Promise<void> {
+      return await supabase.updatePaymentStatus(orderId, paymentStatus)
     },
   },
 
