@@ -2458,12 +2458,11 @@ export default function App() {
                 src="/logo.png"
                 alt="Holy Name University SmartBite"
                 style={{
-                  width: "108px",
-                  height: "108px",
+                  width: "140px",
+                  height: "140px",
                   objectFit: "contain",
-                  borderRadius: "50%",
                   marginBottom: "14px",
-                  boxShadow: "0 4px 18px rgba(0, 0, 0, 0.08)",
+                  filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.12))",
                   display: "inline-block",
                 }}
               />
@@ -2564,12 +2563,11 @@ export default function App() {
                   src="/logo.png"
                   alt="Holy Name University SmartBite"
                   style={{
-                    width: "52px",
-                    height: "52px",
+                    width: "68px",
+                    height: "68px",
                     objectFit: "contain",
-                    borderRadius: "50%",
                     flexShrink: 0,
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                    filter: "drop-shadow(0 3px 10px rgba(0, 0, 0, 0.10))",
                   }}
                 />
                 <div>

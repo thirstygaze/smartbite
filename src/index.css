@@ -457,7 +457,7 @@ a {
 .sidebar-brand-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 0 4px 20px;
 }
 .sidebar-logo-badge {
@@ -474,14 +474,18 @@ a {
   box-shadow: 0 2px 8px rgba(45, 82, 62, 0.25);
 }
 .sidebar-brand-logo-img {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 46px;
+  height: 46px;
   object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.12));
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.12));
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.sidebar-brand-logo-img:hover {
+  transform: scale(1.05);
 }
 .sidebar-brand-name {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   font-family: var(--font-serif);
   color: var(--ink);
