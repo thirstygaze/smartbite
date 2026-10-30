@@ -1236,10 +1236,20 @@ export default function App() {
     // 2. Secure Admin Authentication (Configured strictly via environment variables, untraceable by hackers/other users)
     const adminUserId = ADMIN_CREDENTIALS.userId.toLowerCase()
     const adminEmail = ADMIN_CREDENTIALS.email.toLowerCase()
-    const isAdminAttempt = trimmedId === adminUserId || trimmedId === adminEmail
+    const isAdminConfigured = Boolean(adminUserId && ADMIN_CREDENTIALS.password)
+    const isAdminAttempt =
+      isAdminConfigured &&
+      (trimmedId === adminUserId || (adminEmail ? trimmedId === adminEmail : false))
 
     // Admin validation rule: Admin ONLY in Admin tab; Non-Admin CANNOT sign in to Admin tab
     if (chosenRole === "admin") {
+      if (!isAdminConfigured) {
+        setAuthError(
+          "Administrator access is disabled. Admin environment variables (VITE_ADMIN_USER_ID, VITE_ADMIN_PASSWORD) are not configured.",
+        )
+        return
+      }
+
       if (!isAdminAttempt) {
         setAuthError(
           "Access denied: only administrators can sign in under the Admin tab.",
@@ -1376,6 +1386,7 @@ export default function App() {
       if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
         setForgotEmail(trimmed.toLowerCase())
       } else if (
+        ADMIN_CREDENTIALS.userId &&
         trimmed.toLowerCase() === ADMIN_CREDENTIALS.userId.toLowerCase()
       ) {
         setForgotEmail(ADMIN_CREDENTIALS.email)
@@ -1407,7 +1418,10 @@ export default function App() {
 
     // Match against Admin credentials or database profiles
     // Admin password is managed only through the .env file and cannot be reset from the browser
-    if (cleanEmail === ADMIN_CREDENTIALS.email.toLowerCase()) {
+    if (
+      ADMIN_CREDENTIALS.email &&
+      cleanEmail === ADMIN_CREDENTIALS.email.toLowerCase()
+    ) {
       setForgotError(
         "The administrator password cannot be reset here. Please update it in the server .env configuration.",
       )
@@ -5191,8 +5205,9 @@ export default function App() {
                                     className="btn-secondary"
                                     onClick={async () => {
                                       if (
-                                        user.student_id ===
-                                          ADMIN_CREDENTIALS.userId ||
+                                        (ADMIN_CREDENTIALS.userId &&
+                                          user.student_id ===
+                                            ADMIN_CREDENTIALS.userId) ||
                                         user.id === currentUser.id
                                       ) {
                                         alert(

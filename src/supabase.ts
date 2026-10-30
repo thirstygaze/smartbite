@@ -12,16 +12,13 @@ export const SUPABASE_ANON_KEY =
   import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "sb_publishable_cJk4jM2_UbvuoFJq0bbNAg_MPRdR3QS"
 
-// Secure Admin Credentials from environment variables (Never hardcoded, untraceable by unauthorized users)
+// Secure Admin Credentials strictly loaded from environment variables (.env)
+// Never hardcoded, no default passwords or IDs exposed in client code
 export const ADMIN_CREDENTIALS = {
-  userId: (import.meta.env.VITE_ADMIN_USER_ID || "ADMIN-DBA").trim(),
-  email: (import.meta.env.VITE_ADMIN_EMAIL || "admin@smartbite.edu.ph")
-    .trim()
-    .toLowerCase(),
-  password: (import.meta.env.VITE_ADMIN_PASSWORD || "admin123").trim(),
-  name: (
-    import.meta.env.VITE_ADMIN_NAME || "Lead DBA & Canteen Administrator"
-  ).trim(),
+  userId: (import.meta.env.VITE_ADMIN_USER_ID || "").trim(),
+  email: (import.meta.env.VITE_ADMIN_EMAIL || "").trim().toLowerCase(),
+  password: (import.meta.env.VITE_ADMIN_PASSWORD || "").trim(),
+  name: (import.meta.env.VITE_ADMIN_NAME || "Administrator").trim(),
 }
 
 const MENU_IMAGE_BUCKET = "menu-images"
@@ -436,25 +433,6 @@ const INITIAL_PROFILES: Profile[] = [
     password: "staff123",
     is_active: true,
     created_at: "2026-10-26T08:45:00Z",
-  },
-  {
-    id: "p-3",
-    student_id: (import.meta.env.VITE_ADMIN_USER_ID || "ADMIN-DBA").trim(),
-    email: (import.meta.env.VITE_ADMIN_EMAIL || "admin@smartbite.edu.ph")
-      .trim()
-      .toLowerCase(),
-    first_name: "Lead",
-    middle_name: "",
-    last_name: "Administrator",
-    full_name: (
-      import.meta.env.VITE_ADMIN_NAME || "Lead DBA & Canteen Administrator"
-    ).trim(),
-    grade_or_dept: "Database & Canteen Administration",
-    role: "admin",
-    balance: 5000.0,
-    password: (import.meta.env.VITE_ADMIN_PASSWORD || "admin123").trim(),
-    is_active: true,
-    created_at: "2026-10-26T07:00:00Z",
   },
   {
     id: "p-4",
