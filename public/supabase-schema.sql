@@ -82,8 +82,13 @@ UPDATE public.profiles
 SET role = 'student'
 WHERE role IS NULL OR role NOT IN ('student', 'staff', 'stall_manager', 'admin');
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_student_id
-  ON public.profiles(student_id);
+DO $$
+BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_student_id
+    ON public.profiles(student_id);
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- Auth Trigger: handles new Supabase auth users automatically
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -398,7 +403,7 @@ SELECT
   i.current_stock,
   i.minimum_threshold,
   i.unit_of_measure,
-  GREATEST(0, (i.minimum_threshold - i.current_stock)) AS deficit_amount,
+  GREATEST(0::numeric, (i.minimum_threshold - i.current_stock)) AS deficit_amount,
   CASE 
     WHEN i.current_stock = 0 THEN 'OUT OF STOCK'
     WHEN i.current_stock <= (i.minimum_threshold * 0.5) THEN 'CRITICAL'
@@ -704,61 +709,99 @@ BEGIN
 END $$;
 
 -- 1. Profiles Policies
+DROP POLICY IF EXISTS "Allow public read on profiles" ON public.profiles;
 CREATE POLICY "Allow public read on profiles" ON public.profiles FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public insert on profiles" ON public.profiles;
 CREATE POLICY "Allow public insert on profiles" ON public.profiles FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public update on profiles" ON public.profiles;
 CREATE POLICY "Allow public update on profiles" ON public.profiles FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public delete on profiles" ON public.profiles;
 CREATE POLICY "Allow public delete on profiles" ON public.profiles FOR DELETE USING (true);
 
 -- 2. Stalls Policies
+DROP POLICY IF EXISTS "Allow read on stalls" ON public.stalls;
 CREATE POLICY "Allow read on stalls" ON public.stalls FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on stalls" ON public.stalls;
 CREATE POLICY "Allow insert on stalls" ON public.stalls FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on stalls" ON public.stalls;
 CREATE POLICY "Allow update on stalls" ON public.stalls FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on stalls" ON public.stalls;
 CREATE POLICY "Allow delete on stalls" ON public.stalls FOR DELETE USING (true);
 
 -- 3. Categories Policies
+DROP POLICY IF EXISTS "Allow read on categories" ON public.categories;
 CREATE POLICY "Allow read on categories" ON public.categories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on categories" ON public.categories;
 CREATE POLICY "Allow insert on categories" ON public.categories FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on categories" ON public.categories;
 CREATE POLICY "Allow update on categories" ON public.categories FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on categories" ON public.categories;
 CREATE POLICY "Allow delete on categories" ON public.categories FOR DELETE USING (true);
 
 -- 4. Menu Items Policies
+DROP POLICY IF EXISTS "Allow read on menu_items" ON public.menu_items;
 CREATE POLICY "Allow read on menu_items" ON public.menu_items FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on menu_items" ON public.menu_items;
 CREATE POLICY "Allow insert on menu_items" ON public.menu_items FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on menu_items" ON public.menu_items;
 CREATE POLICY "Allow update on menu_items" ON public.menu_items FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on menu_items" ON public.menu_items;
 CREATE POLICY "Allow delete on menu_items" ON public.menu_items FOR DELETE USING (true);
 
 -- 5. Inventory Items Policies
+DROP POLICY IF EXISTS "Allow read on inventory_items" ON public.inventory_items;
 CREATE POLICY "Allow read on inventory_items" ON public.inventory_items FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on inventory_items" ON public.inventory_items;
 CREATE POLICY "Allow insert on inventory_items" ON public.inventory_items FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on inventory_items" ON public.inventory_items;
 CREATE POLICY "Allow update on inventory_items" ON public.inventory_items FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on inventory_items" ON public.inventory_items;
 CREATE POLICY "Allow delete on inventory_items" ON public.inventory_items FOR DELETE USING (true);
 
 -- 6. Menu Item Ingredients Policies
+DROP POLICY IF EXISTS "Allow read on menu_item_ingredients" ON public.menu_item_ingredients;
 CREATE POLICY "Allow read on menu_item_ingredients" ON public.menu_item_ingredients FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on menu_item_ingredients" ON public.menu_item_ingredients;
 CREATE POLICY "Allow insert on menu_item_ingredients" ON public.menu_item_ingredients FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on menu_item_ingredients" ON public.menu_item_ingredients;
 CREATE POLICY "Allow update on menu_item_ingredients" ON public.menu_item_ingredients FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on menu_item_ingredients" ON public.menu_item_ingredients;
 CREATE POLICY "Allow delete on menu_item_ingredients" ON public.menu_item_ingredients FOR DELETE USING (true);
 
 -- 7. Stall Staff Policies
+DROP POLICY IF EXISTS "Allow read on stall_staff" ON public.stall_staff;
 CREATE POLICY "Allow read on stall_staff" ON public.stall_staff FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on stall_staff" ON public.stall_staff;
 CREATE POLICY "Allow insert on stall_staff" ON public.stall_staff FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on stall_staff" ON public.stall_staff;
 CREATE POLICY "Allow update on stall_staff" ON public.stall_staff FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on stall_staff" ON public.stall_staff;
 CREATE POLICY "Allow delete on stall_staff" ON public.stall_staff FOR DELETE USING (true);
 
 -- 8. Orders Policies
+DROP POLICY IF EXISTS "Allow read on orders" ON public.orders;
 CREATE POLICY "Allow read on orders" ON public.orders FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on orders" ON public.orders;
 CREATE POLICY "Allow insert on orders" ON public.orders FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on orders" ON public.orders;
 CREATE POLICY "Allow update on orders" ON public.orders FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on orders" ON public.orders;
 CREATE POLICY "Allow delete on orders" ON public.orders FOR DELETE USING (true);
 
 -- 9. Order Items Policies
+DROP POLICY IF EXISTS "Allow read on order_items" ON public.order_items;
 CREATE POLICY "Allow read on order_items" ON public.order_items FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on order_items" ON public.order_items;
 CREATE POLICY "Allow insert on order_items" ON public.order_items FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on order_items" ON public.order_items;
 CREATE POLICY "Allow update on order_items" ON public.order_items FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on order_items" ON public.order_items;
 CREATE POLICY "Allow delete on order_items" ON public.order_items FOR DELETE USING (true);
 
 -- 10. Audit Logs Policies
+DROP POLICY IF EXISTS "Allow read on audit_logs" ON public.audit_logs;
 CREATE POLICY "Allow read on audit_logs" ON public.audit_logs FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on audit_logs" ON public.audit_logs;
 CREATE POLICY "Allow insert on audit_logs" ON public.audit_logs FOR INSERT WITH CHECK (true);
 
 -- Realtime Subscriptions Configuration
@@ -788,61 +831,86 @@ END $$;
 -- =====================================================================================
 
 -- 1. Initial Stalls
-INSERT INTO public.stalls (id, name, stall_code, description, is_open, rating) VALUES
-  (1, 'SmartBite Main Kitchen', 'STALL-01', 'Signature rice meals, breakfasts, and hot mains', true, 4.9),
-  (2, 'The Snack Bar & Drinks', 'STALL-02', 'Quick finger bites, dimsum, and freshly pressed refreshments', true, 4.8)
-ON CONFLICT (id) DO UPDATE SET 
-  name = EXCLUDED.name,
-  stall_code = EXCLUDED.stall_code,
-  description = EXCLUDED.description;
+DO $$
+BEGIN
+  INSERT INTO public.stalls (id, name, stall_code, description, is_open, rating) VALUES
+    (1, 'SmartBite Main Kitchen', 'STALL-01', 'Signature rice meals, breakfasts, and hot mains', true, 4.9),
+    (2, 'The Snack Bar & Drinks', 'STALL-02', 'Quick finger bites, dimsum, and freshly pressed refreshments', true, 4.8)
+  ON CONFLICT (id) DO UPDATE SET 
+    name = EXCLUDED.name,
+    stall_code = EXCLUDED.stall_code,
+    description = EXCLUDED.description;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- 2. Initial Categories
-INSERT INTO public.categories (id, stall_id, name, description, display_order) VALUES
-  (1, 1, 'Rice Meals', 'Hearty meals served with steamed or garlic rice', 1),
-  (2, 1, 'Breakfast', 'Morning favorites to kickstart school days', 2),
-  (3, 2, 'Snacks', 'Savory dumplings, wraps, and quick bites', 3),
-  (4, 2, 'Drinks', 'Chilled juices, coolers, and refreshments', 4)
-ON CONFLICT (id) DO NOTHING;
+DO $$
+BEGIN
+  INSERT INTO public.categories (id, stall_id, name, description, display_order) VALUES
+    (1, 1, 'Rice Meals', 'Hearty meals served with steamed or garlic rice', 1),
+    (2, 1, 'Breakfast', 'Morning favorites to kickstart school days', 2),
+    (3, 2, 'Snacks', 'Savory dumplings, wraps, and quick bites', 3),
+    (4, 2, 'Drinks', 'Chilled juices, coolers, and refreshments', 4)
+  ON CONFLICT (id) DO NOTHING;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- 3. Initial Menu Items
-INSERT INTO public.menu_items (id, stall_id, category_id, category, name, description, price, preparation_time_minutes, rating, image_url, is_available) VALUES
-  (1, 1, 1, 'Rice Meals', 'Chicken Adobo Bowl', 'Tender chicken braised in garlic-soy vinegar with jasmine rice', 75.00, 8, '4.9', 'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85', true),
-  (2, 1, 1, 'Rice Meals', 'Crispy Fried Chicken', 'Golden spiced chicken thigh with savory gravy and garlic rice', 85.00, 10, '4.8', 'https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85', true),
-  (3, 1, 1, 'Rice Meals', 'Fresh Veggie Rice Bowl', 'Wok-tossed market vegetables, fried tofu, and seasoned garlic rice', 65.00, 7, '4.7', 'https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85', true),
-  (4, 1, 2, 'Breakfast', 'Beef Tapa Silog', 'Marinated cured beef sirloin with sunny fried egg and garlic rice', 80.00, 9, '4.8', 'https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85', true),
-  (5, 2, 3, 'Snacks', 'Classic Pork Siomai', 'Four steamed pork-shrimp dumplings with garlic chili oil', 45.00, 5, '4.9', 'https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85', true),
-  (6, 2, 4, 'Drinks', 'Chilled Calamansi Juice', 'Freshly extracted native lime, honey, and crushed iced water', 30.00, 3, '4.6', 'https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85', true)
-ON CONFLICT (id) DO UPDATE SET 
-  name = EXCLUDED.name, 
-  price = EXCLUDED.price,
-  category = EXCLUDED.category,
-  preparation_time_minutes = EXCLUDED.preparation_time_minutes;
+DO $$
+BEGIN
+  INSERT INTO public.menu_items (id, stall_id, category_id, category, name, description, price, preparation_time_minutes, rating, image_url, is_available) VALUES
+    (1, 1, 1, 'Rice Meals', 'Chicken Adobo Bowl', 'Tender chicken braised in garlic-soy vinegar with jasmine rice', 75.00, 8, '4.9', 'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85', true),
+    (2, 1, 1, 'Rice Meals', 'Crispy Fried Chicken', 'Golden spiced chicken thigh with savory gravy and garlic rice', 85.00, 10, '4.8', 'https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85', true),
+    (3, 1, 1, 'Rice Meals', 'Fresh Veggie Rice Bowl', 'Wok-tossed market vegetables, fried tofu, and seasoned garlic rice', 65.00, 7, '4.7', 'https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85', true),
+    (4, 1, 2, 'Breakfast', 'Beef Tapa Silog', 'Marinated cured beef sirloin with sunny fried egg and garlic rice', 80.00, 9, '4.8', 'https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85', true),
+    (5, 2, 3, 'Snacks', 'Classic Pork Siomai', 'Four steamed pork-shrimp dumplings with garlic chili oil', 45.00, 5, '4.9', 'https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85', true),
+    (6, 2, 4, 'Drinks', 'Chilled Calamansi Juice', 'Freshly extracted native lime, honey, and crushed iced water', 30.00, 3, '4.6', 'https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85', true)
+  ON CONFLICT (id) DO UPDATE SET 
+    name = EXCLUDED.name, 
+    price = EXCLUDED.price,
+    category = EXCLUDED.category,
+    preparation_time_minutes = EXCLUDED.preparation_time_minutes;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- 4. Initial Raw Stock Inventory
-INSERT INTO public.inventory_items (id, stall_id, item_name, unit_of_measure, current_stock, minimum_threshold, reorder_quantity) VALUES
-  (1, 1, 'Marinated Chicken Cuts', 'kg', 45.00, 10.00, 50.00),
-  (2, 1, 'Jasmine Steamed Rice', 'kg', 80.00, 15.00, 100.00),
-  (3, 1, 'Beef Tapa Cuts', 'kg', 30.00, 8.00, 40.00),
-  (4, 1, 'Farm Fresh Eggs', 'pieces', 120.00, 24.00, 150.00),
-  (5, 2, 'Pork Siomai Pack', 'pieces', 200.00, 40.00, 250.00),
-  (6, 2, 'Fresh Calamansi Puree', 'liters', 25.00, 5.00, 30.00)
-ON CONFLICT (id) DO UPDATE SET 
-  current_stock = EXCLUDED.current_stock,
-  minimum_threshold = EXCLUDED.minimum_threshold;
+DO $$
+BEGIN
+  INSERT INTO public.inventory_items (id, stall_id, item_name, unit_of_measure, current_stock, minimum_threshold, reorder_quantity) VALUES
+    (1, 1, 'Marinated Chicken Cuts', 'kg', 45.00, 10.00, 50.00),
+    (2, 1, 'Jasmine Steamed Rice', 'kg', 80.00, 15.00, 100.00),
+    (3, 1, 'Beef Tapa Cuts', 'kg', 30.00, 8.00, 40.00),
+    (4, 1, 'Farm Fresh Eggs', 'pieces', 120.00, 24.00, 150.00),
+    (5, 2, 'Pork Siomai Pack', 'pieces', 200.00, 40.00, 250.00),
+    (6, 2, 'Fresh Calamansi Puree', 'liters', 25.00, 5.00, 30.00)
+  ON CONFLICT (id) DO UPDATE SET 
+    current_stock = EXCLUDED.current_stock,
+    minimum_threshold = EXCLUDED.minimum_threshold;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- 5. Menu-Ingredient Recipe Mappings (Junction Table 1)
-INSERT INTO public.menu_item_ingredients (id, menu_item_id, inventory_item_id, quantity_required, unit, is_critical) VALUES
-  (1, 1, 1, 1.00, 'kg', true),      -- 1 portion chicken per adobo
-  (2, 1, 2, 1.00, 'kg', true),      -- 1 portion rice per adobo
-  (3, 2, 1, 1.00, 'kg', true),      -- 1 portion chicken per fried chicken
-  (4, 2, 2, 1.00, 'kg', true),      -- 1 portion rice per fried chicken
-  (5, 3, 2, 1.00, 'kg', true),      -- 1 portion rice per veggie bowl
-  (6, 4, 3, 1.00, 'kg', true),      -- 1 portion beef tapa
-  (7, 4, 4, 1.00, 'pieces', true),  -- 1 egg per silog
-  (8, 4, 2, 1.00, 'kg', true),      -- 1 portion rice per silog
-  (9, 5, 5, 4.00, 'pieces', true),  -- 4 siomai pieces
-  (10, 6, 6, 1.00, 'liters', true)  -- 1 portion calamansi puree
-ON CONFLICT (id) DO NOTHING;
+DO $$
+BEGIN
+  INSERT INTO public.menu_item_ingredients (id, menu_item_id, inventory_item_id, quantity_required, unit, is_critical) VALUES
+    (1, 1, 1, 1.00, 'kg', true),      -- 1 portion chicken per adobo
+    (2, 1, 2, 1.00, 'kg', true),      -- 1 portion rice per adobo
+    (3, 2, 1, 1.00, 'kg', true),      -- 1 portion chicken per fried chicken
+    (4, 2, 2, 1.00, 'kg', true),      -- 1 portion rice per fried chicken
+    (5, 3, 2, 1.00, 'kg', true),      -- 1 portion rice per veggie bowl
+    (6, 4, 3, 1.00, 'kg', true),      -- 1 portion beef tapa
+    (7, 4, 4, 1.00, 'pieces', true),  -- 1 egg per silog
+    (8, 4, 2, 1.00, 'kg', true),      -- 1 portion rice per silog
+    (9, 5, 5, 4.00, 'pieces', true),  -- 4 siomai pieces
+    (10, 6, 6, 1.00, 'liters', true)  -- 1 portion calamansi puree
+  ON CONFLICT (id) DO NOTHING;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- 6. Seed Profiles for Demo Roles (Admin account managed securely via environment / auth)
 DO $$
