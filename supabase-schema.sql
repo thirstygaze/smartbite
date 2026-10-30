@@ -9,11 +9,16 @@
 -- =====================================================================================
 
 -- Refresh dependent views & stored functions safely
-DROP VIEW IF EXISTS v_stall_sales_analytics CASCADE;
-DROP VIEW IF EXISTS v_low_stock_alerts CASCADE;
-DROP FUNCTION IF EXISTS sp_place_canteen_order CASCADE;
-DROP FUNCTION IF EXISTS sp_update_order_status CASCADE;
-DROP FUNCTION IF EXISTS sp_restock_inventory CASCADE;
+DO $$
+BEGIN
+  EXECUTE 'DROP VIEW IF EXISTS v_stall_sales_analytics CASCADE';
+  EXECUTE 'DROP VIEW IF EXISTS v_low_stock_alerts CASCADE';
+  EXECUTE 'DROP FUNCTION IF EXISTS sp_place_canteen_order CASCADE';
+  EXECUTE 'DROP FUNCTION IF EXISTS sp_update_order_status CASCADE';
+  EXECUTE 'DROP FUNCTION IF EXISTS sp_restock_inventory CASCADE';
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- =====================================================================================
 -- 1. PROFILES (Entity 1: User Identity & Multi-Tier RBAC)
