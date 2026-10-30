@@ -536,6 +536,7 @@ export default function App() {
   const [newLastName, setNewLastName] = useState("")
   const [newPhone, setNewPhone] = useState("")
   const [newPassword, setNewPassword] = useState("")
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [newStallId, setNewStallId] = useState<number>(1)
   const [newBalance, setNewBalance] = useState<number>(500)
   const [createNewStallCheckbox, setCreateNewStallCheckbox] = useState(false)
@@ -548,6 +549,7 @@ export default function App() {
   // Admin Reset User Password Modal
   const [adminResetUser, setAdminResetUser] = useState<Profile | null>(null)
   const [adminResetNewPwd, setAdminResetNewPwd] = useState("")
+  const [showAdminResetPwd, setShowAdminResetPwd] = useState(false)
 
   // Admin Edit User Modal (Change Name, Role, ID, Email, Phone, Balance, Stall)
   const [adminEditUser, setAdminEditUser] = useState<Profile | null>(null)
@@ -1836,6 +1838,7 @@ export default function App() {
       setNewLastName("")
       setNewPhone("")
       setNewPassword("")
+      setShowNewPassword(false)
       setCreateNewStallCheckbox(false)
       setNewStallName("")
       setAdminUserModalSuccess("")
@@ -4945,6 +4948,8 @@ export default function App() {
                         onClick={() => {
                           setAdminCreateUserModalOpen(true)
                           setNewPassword("")
+      setShowNewPassword(false)
+                          setShowNewPassword(false)
                           setAdminUserModalError("")
                           setAdminUserModalSuccess("")
                         }}
@@ -10278,24 +10283,54 @@ export default function App() {
                   }}
                 >
                   <div className="crud-form-group">
-                    <label>Create a Password</label>
-                    <input
-                      type="password"
-                      placeholder="Password "
-                      value={newPassword}
-                      onChange={(e) =>
-                        setNewPassword(e.target.value.replace(/\s/g, ""))
-                      }
-                      required
-                    />
-                    <small
+                    <label>Create a Password *</label>
+                    <div
                       style={{
-                        color: "var(--muted)",
-                        fontSize: "11px",
-                        marginTop: "3px",
-                        display: "block",
+                        position: "relative",
+                        display: "flex",
+                        alignItems: "center",
                       }}
-                    ></small>
+                    >
+                      <input
+                        type={showNewPassword ? "text" : "password"}
+                        placeholder="Password "
+                        value={newPassword}
+                        onChange={(e) =>
+                          setNewPassword(e.target.value.replace(/\s/g, ""))
+                        }
+                        style={{
+                          width: "100%",
+                          paddingRight: "38px",
+                          boxSizing: "border-box",
+                        }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        tabIndex={-1}
+                        style={{
+                          position: "absolute",
+                          right: "8px",
+                          background: "none",
+                          border: "none",
+                          color: "var(--muted)",
+                          cursor: "pointer",
+                          padding: "4px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        title={
+                          showNewPassword ? "Hide password" : "Show password"
+                        }
+                      >
+                        <Icon
+                          name={showNewPassword ? "eye-off" : "eye"}
+                          size={17}
+                        />
+                      </button>
+                    </div>
                   </div>
                   <div className="crud-form-group">
                     <label>Initial Balance (₱)</label>
@@ -10561,15 +10596,53 @@ export default function App() {
 
                 <div className="crud-form-group">
                   <label>Enter New Password for User</label>
-                  <input
-                    type="password"
-                    placeholder="e.g. newpassword123"
-                    value={adminResetNewPwd}
-                    onChange={(e) =>
-                      setAdminResetNewPwd(e.target.value.replace(/\s/g, ""))
-                    }
-                    required
-                  />
+                  <div
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <input
+                      type={showAdminResetPwd ? "text" : "password"}
+                      placeholder="Password"
+                      value={adminResetNewPwd}
+                      onChange={(e) =>
+                        setAdminResetNewPwd(e.target.value.replace(/\s/g, ""))
+                      }
+                      style={{
+                        width: "100%",
+                        paddingRight: "38px",
+                        boxSizing: "border-box",
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminResetPwd(!showAdminResetPwd)}
+                      tabIndex={-1}
+                      style={{
+                        position: "absolute",
+                        right: "8px",
+                        background: "none",
+                        border: "none",
+                        color: "var(--muted)",
+                        cursor: "pointer",
+                        padding: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      title={
+                        showAdminResetPwd ? "Hide password" : "Show password"
+                      }
+                    >
+                      <Icon
+                        name={showAdminResetPwd ? "eye-off" : "eye"}
+                        size={17}
+                      />
+                    </button>
+                  </div>
                   <small
                     style={{
                       color: "var(--muted)",
@@ -10578,8 +10651,7 @@ export default function App() {
                       display: "block",
                     }}
                   >
-                    Mix letters & numbers, min 6 characters, no spaces or
-                    repeating digits.
+                    
                   </small>
                 </div>
               </div>
@@ -10665,8 +10737,7 @@ export default function App() {
                   <div className="toast-success">{editSuccess}</div>
                 )}
                 <p className="auth-callout-notice" role="note">
-                  Email and user ID are managed manually in Supabase and cannot
-                  be changed here.
+                  
                 </p>
 
                 {/* Role Selector Tabs */}
@@ -10760,7 +10831,7 @@ export default function App() {
                       display: "block",
                     }}
                   >
-                    Letters only. Formatted display name:{" "}
+                  
                     <strong>
                       {`${editFirstName.trim()} ${
                         editMiddleName.trim() ? editMiddleName.trim() + " " : ""
@@ -10829,7 +10900,7 @@ export default function App() {
                         display: "block",
                       }}
                     >
-                      Numbers only. Exactly 11 digits (Enter your phone number).
+                    
                     </small>
                   </div>
                 </div>
