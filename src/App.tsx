@@ -2453,12 +2453,29 @@ export default function App() {
       return (
         <div className="auth-page">
           <div className="auth-card" style={{ maxWidth: "440px" }}>
-            <div className="auth-header">
-              <span className="eyebrow-chip">
-                <span className="sparkle"></span> YOUR CAMPUS, YOUR CANTEEN
-              </span>
-              <h1>Welcome to Smartbite.</h1>
-              <p></p>
+            <div className="auth-header" style={{ textAlign: "center" }}>
+              <img
+                src="/logo.png"
+                alt="Holy Name University SmartBite"
+                style={{
+                  width: "108px",
+                  height: "108px",
+                  objectFit: "contain",
+                  borderRadius: "50%",
+                  marginBottom: "14px",
+                  boxShadow: "0 4px 18px rgba(0, 0, 0, 0.08)",
+                  display: "inline-block",
+                }}
+              />
+              <div>
+                <span className="eyebrow-chip" style={{ display: "inline-flex" }}>
+                  <span className="sparkle"></span> YOUR CAMPUS, YOUR CANTEEN
+                </span>
+                <h1 style={{ marginTop: "6px" }}>Welcome to Smartbite.</h1>
+                <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "13px" }}>
+                  Holy Name University &bull; Official Canteen Ordering System
+                </p>
+              </div>
             </div>
 
             <button
@@ -2494,8 +2511,24 @@ export default function App() {
             </div>
 
             {/* School Footer Pill */}
-            <div className="school-footer-pill">
-              <span className="school-badge-mini">HNU</span>
+            <div
+              className="school-footer-pill"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <img
+                src="/logo.png"
+                alt="HNU"
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  objectFit: "contain",
+                  borderRadius: "50%",
+                }}
+              />
               <span>Holy Name University &bull; School canteen portal</span>
             </div>
           </div>
@@ -2519,10 +2552,35 @@ export default function App() {
             </button>
 
             <div className="auth-header">
-              <span className="eyebrow-chip">
-                <span className="sparkle"></span> WELCOME TO YOUR CANTEEN
-              </span>
-              <h1>Good to have you.</h1>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginBottom: "8px",
+                }}
+              >
+                <img
+                  src="/logo.png"
+                  alt="Holy Name University SmartBite"
+                  style={{
+                    width: "52px",
+                    height: "52px",
+                    objectFit: "contain",
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                  }}
+                />
+                <div>
+                  <span className="eyebrow-chip" style={{ margin: 0 }}>
+                    <span className="sparkle"></span> WELCOME TO YOUR CANTEEN
+                  </span>
+                  <h1 style={{ margin: "2px 0 0", fontSize: "22px" }}>
+                    Good to have you.
+                  </h1>
+                </div>
+              </div>
             </div>
 
             {/* Segmented Role Selector */}
@@ -2742,7 +2800,7 @@ export default function App() {
                           type="email"
                           value={forgotEmail}
                           onChange={(e) => setForgotEmail(e.target.value)}
-                          placeholder="e.g. student@smartbite.ph or admin@smartbite.edu.ph"
+                          placeholder="Entery your Email"
                           required
                           autoFocus
                         />
@@ -10983,9 +11041,26 @@ export default function App() {
               >
                 <div
                   className="school-badge-square"
-                  style={{ width: "40px", height: "40px", fontSize: "13px" }}
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    padding: "2px",
+                    overflow: "hidden",
+                    background: "#fff",
+                    border: "1px solid var(--line)",
+                    borderRadius: "8px",
+                  }}
                 >
-                  {activeCampus.abbr}
+                  <img
+                    src="/logo.png"
+                    alt="Holy Name University"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      borderRadius: "6px",
+                    }}
+                  />
                 </div>
                 <div>
                   <h3
