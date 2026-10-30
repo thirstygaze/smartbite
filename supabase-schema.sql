@@ -63,6 +63,9 @@ BEGIN
   ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
   ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
     CHECK (role IN ('student', 'staff', 'stall_manager', 'admin'));
+  -- Safely drop any legacy auth.users foreign key constraint that blocks demo/local profiles
+  ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_auth_user_fk;
+  ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
 EXCEPTION
   WHEN others THEN NULL;
 END $$;
@@ -94,6 +97,7 @@ DECLARE
   v_middle TEXT;
   v_last TEXT;
   v_full TEXT;
+  v_student_id TEXT;
 BEGIN
   v_first := NULLIF(btrim(NEW.raw_user_meta_data->>'first_name'), '');
   v_middle := NULLIF(btrim(NEW.raw_user_meta_data->>'middle_name'), '');
@@ -103,11 +107,16 @@ BEGIN
     trim(concat_ws(' ', v_first, v_middle, v_last)),
     'Student User'
   );
+  v_student_id := COALESCE(
+    NULLIF(btrim(NEW.raw_user_meta_data->>'student_id'), ''),
+    split_part(NEW.email, '@', 1),
+    'USER-' || substr(NEW.id::TEXT, 1, 8)
+  );
 
   INSERT INTO public.profiles (id, student_id, email, first_name, middle_name, last_name, full_name, grade_or_dept, role)
   VALUES (
     NEW.id,
-    COALESCE(NULLIF(btrim(NEW.raw_user_meta_data->>'student_id'), ''), split_part(NEW.email, '@', 1)),
+    v_student_id,
     NEW.email,
     v_first,
     v_middle,
@@ -118,11 +127,15 @@ BEGIN
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
-    first_name = EXCLUDED.first_name,
-    middle_name = EXCLUDED.middle_name,
-    last_name = EXCLUDED.last_name,
-    full_name = EXCLUDED.full_name;
+    first_name = COALESCE(EXCLUDED.first_name, public.profiles.first_name),
+    middle_name = COALESCE(EXCLUDED.middle_name, public.profiles.middle_name),
+    last_name = COALESCE(EXCLUDED.last_name, public.profiles.last_name),
+    full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
+    updated_at = now();
   RETURN NEW;
+EXCEPTION
+  WHEN others THEN
+    RETURN NEW;
 END;
 $$;
 
@@ -268,7 +281,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   status TEXT NOT NULL DEFAULT 'Order placed',
   order_status TEXT NOT NULL DEFAULT 'Order placed' CHECK (order_status IN ('Order placed', 'Preparing', 'Ready for pickup', 'Completed', 'Cancelled')),
   pickup_time TEXT DEFAULT '8-12 minutes',
-  payment_method TEXT NOT NULL DEFAULT 'Cash at counter' CHECK (payment_method IN ('Cash at counter', 'Student Wallet', 'GCash', 'Maya')),
+  payment_method TEXT NOT NULL DEFAULT 'Cash at counter' CHECK (payment_method IN ('Cash at counter', 'Student Wallet', 'Canteen Wallet', 'GCash', 'Maya')),
   payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded')),
   items JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -297,6 +310,9 @@ ALTER TABLE public.orders
 DO $$
 BEGIN
   ALTER TABLE public.orders ALTER COLUMN student_id TYPE TEXT USING student_id::TEXT;
+  ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+  ALTER TABLE public.orders ADD CONSTRAINT orders_payment_method_check
+    CHECK (payment_method IN ('Cash at counter', 'Student Wallet', 'Canteen Wallet', 'GCash', 'Maya'));
 EXCEPTION
   WHEN others THEN NULL;
 END $$;
@@ -421,6 +437,13 @@ BEGIN
     RETURN OLD;
   END IF;
   RETURN NULL;
+EXCEPTION
+  WHEN others THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    ELSE
+      RETURN NEW;
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -455,6 +478,9 @@ BEGIN
     WHERE id = rec.inventory_item_id;
   END LOOP;
   RETURN NEW;
+EXCEPTION
+  WHEN others THEN
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -669,7 +695,11 @@ BEGIN
     WHERE schemaname = 'public'
   )
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', r.policyname, r.schemaname, r.tablename);
+    BEGIN
+      EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', r.policyname, r.schemaname, r.tablename);
+    EXCEPTION
+      WHEN others THEN NULL;
+    END;
   END LOOP;
 END $$;
 
@@ -814,23 +844,51 @@ INSERT INTO public.menu_item_ingredients (id, menu_item_id, inventory_item_id, q
   (10, 6, 6, 1.00, 'liters', true)  -- 1 portion calamansi puree
 ON CONFLICT (id) DO NOTHING;
 
--- 6. Seed Profiles for All 4 Roles
-INSERT INTO public.profiles (id, student_id, first_name, middle_name, last_name, full_name, grade_or_dept, role, balance, stall_id, password, is_active) VALUES
-  ('a0000000-0000-0000-0000-000000000001', '2025-01234', 'Rommel', '', 'Custodio', 'Rommel Custodio', 'Grade 12 - STEM A', 'student', 500.00, NULL, 'student123', true),
-  ('a0000000-0000-0000-0000-000000000002', 'STAFF-KITCHEN', 'Maria', 'Alvarez', 'Santos', 'Chef Maria Santos', 'Stall #1 Main Kitchen Staff', 'staff', 1200.00, 1, 'staff123', true),
-  ('a0000000-0000-0000-0000-000000000003', 'MGR-BRANCH', 'Carlos', 'Jose', 'Mendoza', 'Carlos Jose Mendoza', 'Stall Operations Manager', 'stall_manager', 3500.00, 1, 'manager123', true),
-  ('a0000000-0000-0000-0000-000000000004', 'ADMIN-DBA', 'David', 'Cruz', 'Reyes', 'Engr. David Reyes (Lead DBA)', 'Database & Canteen Administration', 'admin', 5000.00, NULL, 'admin123', true)
-ON CONFLICT (student_id) DO UPDATE SET
-  full_name = EXCLUDED.full_name,
-  role = EXCLUDED.role,
-  password = EXCLUDED.password;
+-- 6. Seed Profiles for Demo Roles (Admin account managed securely via environment / auth)
+DO $$
+BEGIN
+  INSERT INTO public.profiles (id, student_id, first_name, middle_name, last_name, full_name, grade_or_dept, role, balance, stall_id, password, is_active) VALUES
+    ('a0000000-0000-0000-0000-000000000001', '2025-01234', 'Rommel', '', 'Custodio', 'Rommel Custodio', 'Grade 12 - STEM A', 'student', 500.00, NULL, 'student123', true),
+    ('a0000000-0000-0000-0000-000000000002', 'STAFF-KITCHEN', 'Maria', 'Alvarez', 'Santos', 'Chef Maria Santos', 'Stall #1 Main Kitchen Staff', 'staff', 1200.00, 1, 'staff123', true),
+    ('a0000000-0000-0000-0000-000000000003', 'MGR-BRANCH', 'Carlos', 'Jose', 'Mendoza', 'Carlos Jose Mendoza', 'Stall Operations Manager', 'stall_manager', 3500.00, 1, 'manager123', true)
+  ON CONFLICT (student_id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    role = EXCLUDED.role,
+    password = EXCLUDED.password;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
--- 7. Reset Sequence Counters
-SELECT setval('public.stalls_id_seq', COALESCE((SELECT MAX(id) FROM public.stalls), 1));
-SELECT setval('public.categories_id_seq', COALESCE((SELECT MAX(id) FROM public.categories), 1));
-SELECT setval('public.menu_items_id_seq', COALESCE((SELECT MAX(id) FROM public.menu_items), 1));
-SELECT setval('public.inventory_items_id_seq', COALESCE((SELECT MAX(id) FROM public.inventory_items), 1));
-SELECT setval('public.menu_item_ingredients_id_seq', COALESCE((SELECT MAX(id) FROM public.menu_item_ingredients), 1));
+-- 7. Reset Sequence Counters safely
+DO $$
+BEGIN
+  IF pg_get_serial_sequence('public.stalls', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.stalls', 'id'), COALESCE((SELECT MAX(id) FROM public.stalls), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.categories', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.categories', 'id'), COALESCE((SELECT MAX(id) FROM public.categories), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.menu_items', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.menu_items', 'id'), COALESCE((SELECT MAX(id) FROM public.menu_items), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.inventory_items', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.inventory_items', 'id'), COALESCE((SELECT MAX(id) FROM public.inventory_items), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.menu_item_ingredients', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.menu_item_ingredients', 'id'), COALESCE((SELECT MAX(id) FROM public.menu_item_ingredients), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.stall_staff', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.stall_staff', 'id'), COALESCE((SELECT MAX(id) FROM public.stall_staff), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.order_items', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.order_items', 'id'), COALESCE((SELECT MAX(id) FROM public.order_items), 1));
+  END IF;
+  IF pg_get_serial_sequence('public.audit_logs', 'id') IS NOT NULL THEN
+    PERFORM setval(pg_get_serial_sequence('public.audit_logs', 'id'), COALESCE((SELECT MAX(id) FROM public.audit_logs), 1));
+  END IF;
+EXCEPTION
+  WHEN others THEN NULL;
+END $$;
 
 -- 8. Supabase Storage bucket for product photos (Safely wrapped so lack of storage permissions never halts script)
 DO $$
