@@ -1473,7 +1473,7 @@ export default function App() {
     setForgotNotice("")
     const entered = forgotOtp.trim().replace(/\D/g, "")
     if (!entered || entered.length < 6) {
-      setForgotError("Please enter the complete 6-digit verification code.")
+      setForgotError("Please enter the complete verification code.")
       return
     }
 
@@ -1635,7 +1635,7 @@ export default function App() {
     setRegVerifyError("")
     const entered = regOtp.trim().replace(/\D/g, "")
     if (!entered || entered.length < 6) {
-      setRegVerifyError("Please enter the complete 6-digit verification code.")
+      setRegVerifyError("Please enter the complete verification code.")
       return
     }
 
@@ -2831,7 +2831,7 @@ export default function App() {
                     </form>
                   )}
 
-                  {/* STEP 2: Enter 6-Digit OTP Code */}
+                  {/* STEP 2: Enter Verification Code */}
                   {forgotStep === "verify_code" && (
                     <form onSubmit={handleVerifyForgotOtp}>
                       <div
@@ -2854,7 +2854,7 @@ export default function App() {
                             gap: "6px",
                           }}
                         >
-                          <Icon name="mail" size={15} /> 6-Digit Verification
+                          <Icon name="mail" size={15} /> Verification
                           PIN Dispatched
                         </div>
                         <div
@@ -2865,7 +2865,7 @@ export default function App() {
                             lineHeight: "1.4",
                           }}
                         >
-                          We sent a 6-digit verification code to{" "}
+                          A verification code has been sent to{" "}
                           <strong>{forgotEmail}</strong>.
                         </div>
                         <div
@@ -2889,33 +2889,33 @@ export default function App() {
                             alignItems: "center",
                           }}
                         >
-                          <label>Enter 6-Digit Verification PIN</label>
+                          <label>Enter Verification PIN</label>
                           <span
                             style={{
                               fontSize: "11px",
                               color:
-                                forgotOtp.length === 6
+                                forgotOtp.length >= 6
                                   ? "var(--primary)"
                                   : "var(--muted)",
                               fontWeight: 600,
                             }}
                           >
-                            {forgotOtp.length}/6 digits
+                            {forgotOtp.length}/8 digits
                           </span>
                         </div>
                         <input
                           type="text"
-                          maxLength={6}
+                          maxLength={8}
                           value={forgotOtp}
                           onChange={(e) =>
                             setForgotOtp(e.target.value.replace(/\D/g, ""))
                           }
-                          placeholder="• • • • • •"
+                          placeholder="• • • • • • • •"
                           style={{
                             textAlign: "center",
-                            fontSize: "22px",
+                            fontSize: "20px",
                             fontWeight: 700,
-                            letterSpacing: "8px",
+                            letterSpacing: "6px",
                             padding: "10px",
                           }}
                           required
@@ -3409,7 +3409,7 @@ export default function App() {
                       gap: "6px",
                     }}
                   >
-                    <Icon name="mail" size={15} /> 6-Digit Verification PIN
+                    <Icon name="mail" size={15} /> Verification PIN
                     Dispatched
                   </div>
                   <div
@@ -3420,7 +3420,7 @@ export default function App() {
                       lineHeight: "1.4",
                     }}
                   >
-                    A 6-digit verification code has been sent to{" "}
+                    A verification code has been sent to{" "}
                     <strong>{pendingRegData?.email}</strong>.
                   </div>
                   <div
@@ -3444,33 +3444,33 @@ export default function App() {
                         alignItems: "center",
                       }}
                     >
-                      <label>Enter 6-Digit Verification PIN</label>
+                      <label>Enter Verification PIN</label>
                       <span
                         style={{
                           fontSize: "11px",
                           color:
-                            regOtp.length === 6
+                            regOtp.length >= 6
                               ? "var(--primary)"
                               : "var(--muted)",
                           fontWeight: 600,
                         }}
                       >
-                        {regOtp.length}/6 digits
+                        {regOtp.length}/8 digits
                       </span>
                     </div>
                     <input
                       type="text"
-                      maxLength={6}
+                      maxLength={8}
                       value={regOtp}
                       onChange={(e) =>
                         setRegOtp(e.target.value.replace(/\D/g, ""))
                       }
-                      placeholder="• • • • • •"
+                      placeholder="• • • • • • • •"
                       style={{
                         textAlign: "center",
-                        fontSize: "22px",
+                        fontSize: "20px",
                         fontWeight: 700,
-                        letterSpacing: "8px",
+                        letterSpacing: "6px",
                         padding: "10px",
                       }}
                       required

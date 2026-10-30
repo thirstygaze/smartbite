@@ -125,7 +125,7 @@ export async function verifyEmailCode(
   if (!cleanToken || cleanToken.length < 6) {
     return {
       ok: false,
-      error: "Please enter the complete 6-digit verification code.",
+      error: "Please enter the complete verification code.",
     }
   }
 
