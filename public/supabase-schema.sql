@@ -32,15 +32,17 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   last_name TEXT,
   full_name TEXT NOT NULL,
   grade_or_dept TEXT DEFAULT 'Grade 12 - STEM',
-  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'staff', 'stall_manager', 'admin')),
-  balance NUMERIC(10, 2) DEFAULT 500.00 CHECK (balance >= 0),
+  role TEXT NOT NULL DEFAULT 'student',
+  balance NUMERIC(10, 2) DEFAULT 500.00,
   stall_id BIGINT,
   password TEXT,
   avatar_url TEXT,
   phone_number TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT profiles_role_check CHECK (role IN ('student', 'staff', 'stall_manager', 'admin')),
+  CONSTRAINT profiles_balance_check CHECK (balance >= 0)
 );
 
 -- Backward-compatibility check: ensure existing profiles support all modern columns
@@ -164,8 +166,9 @@ CREATE TABLE IF NOT EXISTS public.stalls (
   description TEXT,
   manager_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   is_open BOOLEAN DEFAULT true,
-  rating NUMERIC(3, 2) DEFAULT 4.8 CHECK (rating >= 1.0 AND rating <= 5.0),
-  created_at TIMESTAMPTZ DEFAULT now()
+  rating NUMERIC(3, 2) DEFAULT 4.8,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT stalls_rating_check CHECK (rating >= 1.0 AND rating <= 5.0)
 );
 
 ALTER TABLE public.stalls
@@ -202,13 +205,15 @@ CREATE TABLE IF NOT EXISTS public.menu_items (
   category TEXT DEFAULT 'Rice Meals',
   name TEXT NOT NULL,
   description TEXT,
-  price NUMERIC(10, 2) NOT NULL CHECK (price > 0),
-  preparation_time_minutes INT DEFAULT 10 CHECK (preparation_time_minutes > 0),
+  price NUMERIC(10, 2) NOT NULL,
+  preparation_time_minutes INT DEFAULT 10,
   rating TEXT DEFAULT '4.8',
   image_url TEXT NOT NULL,
   is_available BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT uq_stall_item UNIQUE (stall_id, name)
+  CONSTRAINT uq_stall_item UNIQUE (stall_id, name),
+  CONSTRAINT menu_items_price_check CHECK (price > 0),
+  CONSTRAINT menu_items_prep_check CHECK (preparation_time_minutes > 0)
 );
 
 ALTER TABLE public.menu_items
@@ -227,12 +232,14 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   item_name TEXT NOT NULL,
-  unit_of_measure TEXT NOT NULL CHECK (unit_of_measure IN ('kg', 'grams', 'pieces', 'liters', 'servings')),
-  current_stock NUMERIC(10, 2) NOT NULL DEFAULT 0.00 CHECK (current_stock >= 0),
+  unit_of_measure TEXT NOT NULL,
+  current_stock NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   minimum_threshold NUMERIC(10, 2) NOT NULL DEFAULT 10.00,
   reorder_quantity NUMERIC(10, 2) NOT NULL DEFAULT 50.00,
   last_restocked_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT uq_stall_inventory UNIQUE (stall_id, item_name)
+  CONSTRAINT uq_stall_inventory UNIQUE (stall_id, item_name),
+  CONSTRAINT inventory_unit_check CHECK (unit_of_measure IN ('kg', 'grams', 'pieces', 'liters', 'servings')),
+  CONSTRAINT inventory_stock_check CHECK (current_stock >= 0)
 );
 
 ALTER TABLE public.inventory_items
@@ -248,11 +255,12 @@ CREATE TABLE IF NOT EXISTS public.menu_item_ingredients (
   id BIGSERIAL PRIMARY KEY,
   menu_item_id BIGINT NOT NULL REFERENCES public.menu_items(id) ON DELETE CASCADE,
   inventory_item_id BIGINT NOT NULL REFERENCES public.inventory_items(id) ON DELETE CASCADE,
-  quantity_required NUMERIC(8, 2) NOT NULL CHECK (quantity_required > 0),
+  quantity_required NUMERIC(8, 2) NOT NULL,
   unit TEXT NOT NULL,
   is_critical BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT uq_menu_ingredient UNIQUE (menu_item_id, inventory_item_id)
+  CONSTRAINT uq_menu_ingredient UNIQUE (menu_item_id, inventory_item_id),
+  CONSTRAINT menu_ingredient_qty_check CHECK (quantity_required > 0)
 );
 
 -- =====================================================================================
@@ -263,11 +271,12 @@ CREATE TABLE IF NOT EXISTS public.stall_staff (
   id BIGSERIAL PRIMARY KEY,
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  role_title TEXT NOT NULL DEFAULT 'Kitchen Staff' CHECK (role_title IN ('Manager', 'Chef', 'Cashier', 'Kitchen Staff')),
+  role_title TEXT NOT NULL DEFAULT 'Kitchen Staff',
   shift_schedule TEXT DEFAULT 'Morning (07:00 - 15:00)',
   is_on_duty BOOLEAN DEFAULT true,
   assigned_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT uq_stall_staff UNIQUE (stall_id, profile_id)
+  CONSTRAINT uq_stall_staff UNIQUE (stall_id, profile_id),
+  CONSTRAINT stall_staff_role_check CHECK (role_title IN ('Manager', 'Chef', 'Cashier', 'Kitchen Staff'))
 );
 
 -- =====================================================================================
@@ -279,18 +288,23 @@ CREATE TABLE IF NOT EXISTS public.orders (
   stall_id BIGINT NOT NULL REFERENCES public.stalls(id) ON DELETE CASCADE,
   student_number TEXT NOT NULL,
   student_name TEXT NOT NULL,
-  subtotal NUMERIC(10, 2) NOT NULL CHECK (subtotal >= 0),
+  subtotal NUMERIC(10, 2) NOT NULL,
   service_fee NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   total NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-  total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
+  total_amount NUMERIC(10, 2) NOT NULL,
   status TEXT NOT NULL DEFAULT 'Order placed',
-  order_status TEXT NOT NULL DEFAULT 'Order placed' CHECK (order_status IN ('Order placed', 'Preparing', 'Ready for pickup', 'Completed', 'Cancelled')),
+  order_status TEXT NOT NULL DEFAULT 'Order placed',
   pickup_time TEXT DEFAULT '8-12 minutes',
-  payment_method TEXT NOT NULL DEFAULT 'Cash at counter' CHECK (payment_method IN ('Cash at counter', 'Student Wallet', 'Canteen Wallet', 'GCash', 'Maya')),
-  payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded')),
+  payment_method TEXT NOT NULL DEFAULT 'Cash at counter',
+  payment_status TEXT NOT NULL DEFAULT 'pending',
   items JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT orders_subtotal_check CHECK (subtotal >= 0),
+  CONSTRAINT orders_total_check CHECK (total_amount >= 0),
+  CONSTRAINT orders_status_check CHECK (order_status IN ('Order placed', 'Preparing', 'Ready for pickup', 'Completed', 'Cancelled')),
+  CONSTRAINT orders_payment_method_check CHECK (payment_method IN ('Cash at counter', 'Student Wallet', 'Canteen Wallet', 'GCash', 'Maya')),
+  CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('pending', 'paid', 'refunded'))
 );
 
 -- Ensure all modern columns exist on existing orders table without breaking changes
@@ -331,12 +345,16 @@ CREATE TABLE IF NOT EXISTS public.order_items (
   order_id TEXT NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
   menu_item_id BIGINT NOT NULL,
   item_name TEXT NOT NULL,
-  quantity INT NOT NULL CHECK (quantity > 0),
-  unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price >= 0),
-  item_subtotal NUMERIC(10, 2) NOT NULL CHECK (item_subtotal >= 0),
+  quantity INT NOT NULL,
+  unit_price NUMERIC(10, 2) NOT NULL,
+  item_subtotal NUMERIC(10, 2) NOT NULL,
   special_instructions TEXT,
-  item_status TEXT DEFAULT 'pending' CHECK (item_status IN ('pending', 'cooking', 'prepared')),
-  created_at TIMESTAMPTZ DEFAULT now()
+  item_status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT order_items_qty_check CHECK (quantity > 0),
+  CONSTRAINT order_items_price_check CHECK (unit_price >= 0),
+  CONSTRAINT order_items_subtotal_check CHECK (item_subtotal >= 0),
+  CONSTRAINT order_items_status_check CHECK (item_status IN ('pending', 'cooking', 'prepared'))
 );
 
 ALTER TABLE public.order_items
@@ -353,12 +371,13 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   id BIGSERIAL PRIMARY KEY,
   table_name TEXT NOT NULL,
   record_id TEXT NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
+  action TEXT NOT NULL,
   performed_by TEXT,
   old_data JSONB,
   new_data JSONB,
   change_summary TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT audit_logs_action_check CHECK (action IN ('INSERT', 'UPDATE', 'DELETE'))
 );
 
 -- =====================================================================================
