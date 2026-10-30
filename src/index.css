@@ -473,6 +473,13 @@ a {
   font-family: var(--font-serif);
   box-shadow: 0 2px 8px rgba(45, 82, 62, 0.25);
 }
+.sidebar-brand-logo-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.12));
+}
 .sidebar-brand-name {
   font-size: 20px;
   font-weight: 700;

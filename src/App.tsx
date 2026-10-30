@@ -3563,7 +3563,11 @@ export default function App() {
       <aside className="app-sidebar">
         {/* Brand Header */}
         <div className="sidebar-brand-row">
-          <div className="sidebar-logo-badge">S</div>
+          <img
+            src="/logo.png"
+            alt="Smartbite Logo"
+            className="sidebar-brand-logo-img"
+          />
           <span className="sidebar-brand-name">Smartbite</span>
         </div>
 
