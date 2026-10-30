@@ -1233,93 +1233,50 @@ export default function App() {
       return
     }
 
-    // 2. Secure Admin Authentication
+    // 2. Secure Admin Authentication (Configured strictly via environment variables, untraceable by hackers/other users)
     const adminUserId = ADMIN_CREDENTIALS.userId.toLowerCase()
     const adminEmail = ADMIN_CREDENTIALS.email.toLowerCase()
     const isAdminAttempt = trimmedId === adminUserId || trimmedId === adminEmail
 
-    // Fetch database profiles for matching
-    const profiles = await canteenApi.auth.getProfiles()
-    const matchedProfile = profiles.find((p) => {
-      const pid = (p.student_id || "").toLowerCase()
-      const pmail = (p.email || "").toLowerCase()
-      return pid === trimmedId || pmail === trimmedId
-    })
-
     // Admin validation rule: Admin ONLY in Admin tab; Non-Admin CANNOT sign in to Admin tab
     if (chosenRole === "admin") {
-      // Check built-in admin credentials
-      if (isAdminAttempt) {
-        if (trimmedPwd !== ADMIN_CREDENTIALS.password) {
-          setAuthError("Invalid credentials. Password is incorrect.")
-          return
-        }
-
-        const adminUser: Profile = {
-          id: "p-admin-dba",
-          student_id: ADMIN_CREDENTIALS.userId,
-          email: ADMIN_CREDENTIALS.email,
-          first_name: "Lead",
-          middle_name: "",
-          last_name: "Administrator",
-          full_name: ADMIN_CREDENTIALS.name,
-          grade_or_dept: "Database & Canteen Administration",
-          role: "admin",
-          balance: 5000.0,
-          password: ADMIN_CREDENTIALS.password,
-          is_active: true,
-        }
-
-        try {
-          localStorage.setItem(
-            "smartbite_session_user",
-            JSON.stringify(adminUser),
-          )
-        } catch {}
-        setCurrentUser(adminUser)
-        setLoggedIn(true)
-        setAuthError("")
-        setAuthNotice("")
-        return
-      }
-
-      // Check database-backed admin account
-      if (matchedProfile && matchedProfile.role === "admin") {
-        if (
-          matchedProfile.password !== trimmedPwd &&
-          trimmedPwd !== "admin123"
-        ) {
-          setAuthError("Invalid credentials. Password is incorrect.")
-          return
-        }
-
-        try {
-          localStorage.setItem(
-            "smartbite_session_user",
-            JSON.stringify(matchedProfile),
-          )
-        } catch {}
-        setCurrentUser(matchedProfile)
-        setLoggedIn(true)
-        setAuthError("")
-        setAuthNotice("")
-        return
-      }
-
-      // If user entered a Student or Staff account while on the Admin tab
-      if (matchedProfile) {
-        const targetTab =
-          matchedProfile.role === "student" ? "Student" : "Staff"
+      if (!isAdminAttempt) {
         setAuthError(
-          `This account is registered as a ${matchedProfile.role}. Please click the "${targetTab}" tab above to sign in.`,
+          "Access denied: only administrators can sign in under the Admin tab.",
         )
         return
       }
 
-      // Neither built-in nor database admin
-      setAuthError(
-        "Access denied: only administrators can sign in under the Admin tab. (Default Admin ID: ADMIN-DBA / admin123)",
-      )
+      if (trimmedPwd !== ADMIN_CREDENTIALS.password) {
+        setAuthError("Invalid credentials. Password is incorrect.")
+        return
+      }
+
+      const adminUser: Profile = {
+        id: "p-admin-dba",
+        student_id: ADMIN_CREDENTIALS.userId,
+        email: ADMIN_CREDENTIALS.email,
+        first_name: "Lead",
+        middle_name: "",
+        last_name: "Administrator",
+        full_name: ADMIN_CREDENTIALS.name,
+        grade_or_dept: "Database & Canteen Administration",
+        role: "admin",
+        balance: 5000.0,
+        password: ADMIN_CREDENTIALS.password,
+        is_active: true,
+      }
+
+      try {
+        localStorage.setItem(
+          "smartbite_session_user",
+          JSON.stringify(adminUser),
+        )
+      } catch {}
+      setCurrentUser(adminUser)
+      setLoggedIn(true)
+      setAuthError("")
+      setAuthNotice("")
       return
     }
 
@@ -1332,7 +1289,13 @@ export default function App() {
     }
 
     // 3. Authenticate Non-Admin Users (Student or Staff)
-    const matched = matchedProfile
+    const profiles = await canteenApi.auth.getProfiles()
+    const matched = profiles.find((p) => {
+      if (p.role === "admin") return false // Admin accounts cannot be logged into via public profile lookup
+      const pid = (p.student_id || "").toLowerCase()
+      const pmail = (p.email || "").toLowerCase()
+      return pid === trimmedId || pmail === trimmedId
+    })
 
     if (!matched) {
       if (chosenRole === "student") {
@@ -2588,139 +2551,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Quick Demo Helper Hint with Auto-fill */}
-            {chosenRole === "admin" && (
-              <div
-                style={{
-                  background: "#F8FAFC",
-                  border: "1px dashed #CBD5E1",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  marginBottom: "16px",
-                  fontSize: "12px",
-                  color: "var(--muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: "6px",
-                }}
-              >
-                <span>
-                  Admin Demo: <strong>ADMIN-DBA</strong> &bull; Password:{" "}
-                  <strong>admin123</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStudentId("ADMIN-DBA")
-                    setPassword("admin123")
-                    setAuthError("")
-                  }}
-                  style={{
-                    background: "var(--primary)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "4px",
-                    padding: "3px 8px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Auto-fill Admin
-                </button>
-              </div>
-            )}
-
-            {chosenRole === "staff" && (
-              <div
-                style={{
-                  background: "#F8FAFC",
-                  border: "1px dashed #CBD5E1",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  marginBottom: "16px",
-                  fontSize: "12px",
-                  color: "var(--muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: "6px",
-                }}
-              >
-                <span>
-                  Staff Demo: <strong>STAFF-KITCHEN</strong> &bull; Password:{" "}
-                  <strong>staff123</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStudentId("STAFF-KITCHEN")
-                    setPassword("staff123")
-                    setAuthError("")
-                  }}
-                  style={{
-                    background: "var(--primary)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "4px",
-                    padding: "3px 8px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Auto-fill Staff
-                </button>
-              </div>
-            )}
-
-            {chosenRole === "student" && (
-              <div
-                style={{
-                  background: "#F8FAFC",
-                  border: "1px dashed #CBD5E1",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  marginBottom: "16px",
-                  fontSize: "12px",
-                  color: "var(--muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: "6px",
-                }}
-              >
-                <span>
-                  Student Demo: <strong>2025-01234</strong> &bull; Password:{" "}
-                  <strong>student123</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStudentId("2025-01234")
-                    setPassword("student123")
-                    setAuthError("")
-                  }}
-                  style={{
-                    background: "var(--primary)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "4px",
-                    padding: "3px 8px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Auto-fill Student
-                </button>
-              </div>
-            )}
-
             {/* Sign In Form */}
             <form onSubmit={handleSignIn}>
               <div className="auth-field">
@@ -2740,10 +2570,10 @@ export default function App() {
                     onChange={(e) => setStudentId(e.target.value)}
                     placeholder={
                       chosenRole === "student"
-                        ? "e.g. 2025-01234 or student email"
+                        ? "student email or ID"
                         : chosenRole === "staff"
-                          ? "e.g. STAFF-KITCHEN or staff email"
-                          : "e.g. ADMIN-DBA or admin email"
+                          ? "staff email or ID"
+                          : "admin email or ID"
                     }
                     autoComplete="username"
                     required
