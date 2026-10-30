@@ -9,15 +9,11 @@
 -- =====================================================================================
 
 -- Refresh dependent views & stored functions safely
-DROP VIEW IF EXISTS public.v_stall_sales_analytics CASCADE;
-DROP VIEW IF EXISTS public.v_low_stock_alerts CASCADE;
-DROP FUNCTION IF EXISTS public.sp_place_canteen_order(TEXT, UUID, BIGINT, TEXT, TEXT, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_place_canteen_order(TEXT, TEXT, BIGINT, TEXT, TEXT, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_place_canteen_order CASCADE;
-DROP FUNCTION IF EXISTS public.sp_update_order_status(TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_update_order_status CASCADE;
-DROP FUNCTION IF EXISTS public.sp_restock_inventory(BIGINT, NUMERIC) CASCADE;
-DROP FUNCTION IF EXISTS public.sp_restock_inventory CASCADE;
+DROP VIEW IF EXISTS v_stall_sales_analytics CASCADE;
+DROP VIEW IF EXISTS v_low_stock_alerts CASCADE;
+DROP FUNCTION IF EXISTS sp_place_canteen_order CASCADE;
+DROP FUNCTION IF EXISTS sp_update_order_status CASCADE;
+DROP FUNCTION IF EXISTS sp_restock_inventory CASCADE;
 
 -- =====================================================================================
 -- 1. PROFILES (Entity 1: User Identity & Multi-Tier RBAC)
@@ -400,7 +396,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_logs(created_at DES
 -- =====================================================================================
 
 -- View 1: Stall Sales Analytics (Aggregated sales & KPI view)
-CREATE OR REPLACE VIEW public.v_stall_sales_analytics AS
+CREATE OR REPLACE VIEW v_stall_sales_analytics AS
 SELECT 
   s.id AS stall_id,
   s.name AS stall_name,
@@ -414,7 +410,7 @@ LEFT JOIN public.orders o ON s.id = o.stall_id
 GROUP BY s.id, s.name, s.stall_code;
 
 -- View 2: Low Stock Alert View (Automated safety threshold notification)
-CREATE OR REPLACE VIEW public.v_low_stock_alerts AS
+CREATE OR REPLACE VIEW v_low_stock_alerts AS
 SELECT 
   i.id AS inventory_id,
   s.name AS stall_name,
