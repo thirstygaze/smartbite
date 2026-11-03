@@ -347,7 +347,7 @@ export function backendApiMiddleware(): Connect.NextHandleFunction {
             category: "Rice Meals",
             rating: "4.9",
             image:
-              "https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85",
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQbOudj4TjCn-ub5u5aNIvOxQ65uMwjUV6OKWGUWC6e5Q&s=10",
             available: true,
           },
           {
@@ -357,7 +357,7 @@ export function backendApiMiddleware(): Connect.NextHandleFunction {
             category: "Rice Meals",
             rating: "4.8",
             image:
-              "https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85",
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTnsQBBRVpnHh-kPNaTtJ5oLorgLvFi6wOr62D60XIyhg&s=10",
             available: true,
           },
           {
@@ -367,7 +367,7 @@ export function backendApiMiddleware(): Connect.NextHandleFunction {
             category: "Rice Meals",
             rating: "4.7",
             image:
-              "https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85",
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRcDQG-3FOuY_1tpqzPmupdKYIr7mYCHc3gBxSTfORrOQ&s=10",
             available: true,
           },
           {
@@ -377,7 +377,7 @@ export function backendApiMiddleware(): Connect.NextHandleFunction {
             category: "Snacks",
             rating: "4.9",
             image:
-              "https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85",
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJvW03OHi_PyDT9yrNmIkVVUHK1Xs7vJhz0IO3J9n7pA&s=10",
             available: true,
           },
           {
@@ -387,7 +387,7 @@ export function backendApiMiddleware(): Connect.NextHandleFunction {
             category: "Breakfast",
             rating: "4.8",
             image:
-              "https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85",
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEj3p9Xy0UW4FzRrVH6rDYo9MdtfnuIFnTo6FsAYTyuA&s=10",
             available: true,
           },
           {
@@ -397,7 +397,7 @@ export function backendApiMiddleware(): Connect.NextHandleFunction {
             category: "Drinks",
             rating: "4.6",
             image:
-              "https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85",
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS8lD-OSljoY0bE0bVFndmdmcma1MEVl8cK7vpBFa0g0A&s=10",
             available: true,
           },
         ]
