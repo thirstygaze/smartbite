@@ -1024,7 +1024,7 @@ export const supabase = {
         preparation_time_minutes: 8,
         rating: "4.9",
         image_url:
-          "https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85",
+          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQbOudj4TjCn-ub5u5aNIvOxQ65uMwjUV6OKWGUWC6e5Q&s=10",
         is_available: true,
       },
       {
@@ -1039,7 +1039,7 @@ export const supabase = {
         preparation_time_minutes: 10,
         rating: "4.8",
         image_url:
-          "https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85",
+          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTnsQBBRVpnHh-kPNaTtJ5oLorgLvFi6wOr62D60XIyhg&s=10",
         is_available: true,
       },
       {
@@ -1054,7 +1054,7 @@ export const supabase = {
         preparation_time_minutes: 7,
         rating: "4.7",
         image_url:
-          "https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85",
+          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQskG_rlJ1pH1zfTODxZBl-7wfDB-urQ8cCeSIGkD57wQ&s=10",
         is_available: true,
       },
       {
@@ -1069,7 +1069,7 @@ export const supabase = {
         preparation_time_minutes: 9,
         rating: "4.8",
         image_url:
-          "https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85",
+          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEj3p9Xy0UW4FzRrVH6rDYo9MdtfnuIFnTo6FsAYTyuA&s=10",
         is_available: true,
       },
       {
@@ -1083,7 +1083,7 @@ export const supabase = {
         preparation_time_minutes: 5,
         rating: "4.9",
         image_url:
-          "https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85",
+          "https://www.google.com/imgres?q=Classic%20Pork%20Siomai&imgurl=https%3A%2F%2Flookaside.fbsbx.com%2Flookaside%2Fcrawler%2Fmedia%2F%3Fmedia_id%3D24729958589942157&imgrefurl=https%3A%2F%2Fwww.facebook.com%2Fjhoeberns%2Fposts%2Fa-popular-filipino-dim-sum-heres-a-simple-pork-siomai-recipeingredients-1-pound-%2F24729958713275478%2F&docid=uPC1kvAjLAvQSM&tbnid=7ntzN2Jj2N8m8M&vet=12ahUKEwir5ZKQ9OqXAxWoleEIHXv1NcoQnPAOegUInAUQAA..i&w=1080&h=1440&hcb=2&ved=2ahUKEwir5ZKQ9OqXAxWoleEIHXv1NcoQnPAOegUInAUQAA",
         is_available: true,
       },
       {
@@ -1098,7 +1098,7 @@ export const supabase = {
         preparation_time_minutes: 3,
         rating: "4.6",
         image_url:
-          "https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85",
+          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS8lD-OSljoY0bE0bVFndmdmcma1MEVl8cK7vpBFa0g0A&s=10",
         is_available: true,
       },
     ]
