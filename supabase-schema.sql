@@ -881,12 +881,12 @@ END $$;
 DO $$
 BEGIN
   INSERT INTO public.menu_items (id, stall_id, category_id, category, name, description, price, preparation_time_minutes, rating, image_url, is_available) VALUES
-    (1, 1, 1, 'Rice Meals', 'Chicken Adobo Bowl', 'Tender chicken braised in garlic-soy vinegar with jasmine rice', 75.00, 8, '4.9', 'https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85', true),
-    (2, 1, 1, 'Rice Meals', 'Crispy Fried Chicken', 'Golden spiced chicken thigh with savory gravy and garlic rice', 85.00, 10, '4.8', 'https://images.unsplash.com/photo-1539156340048-e86bca4fa3f7?auto=format&fit=crop&w=900&q=85', true),
-    (3, 1, 1, 'Rice Meals', 'Fresh Veggie Rice Bowl', 'Wok-tossed market vegetables, fried tofu, and seasoned garlic rice', 65.00, 7, '4.7', 'https://images.unsplash.com/photo-1657812453317-031b93301ef0?auto=format&fit=crop&w=900&q=85', true),
-    (4, 1, 2, 'Breakfast', 'Beef Tapa Silog', 'Marinated cured beef sirloin with sunny fried egg and garlic rice', 80.00, 9, '4.8', 'https://images.unsplash.com/photo-1777312820610-8d5321fd45ad?auto=format&fit=crop&w=900&q=85', true),
-    (5, 2, 3, 'Snacks', 'Classic Pork Siomai', 'Four steamed pork-shrimp dumplings with garlic chili oil', 45.00, 5, '4.9', 'https://images.unsplash.com/photo-1625980319455-985e5442c5ae?auto=format&fit=crop&w=900&q=85', true),
-    (6, 2, 4, 'Drinks', 'Chilled Calamansi Juice', 'Freshly extracted native lime, honey, and crushed iced water', 30.00, 3, '4.6', 'https://images.unsplash.com/photo-1591902060415-60a251d0ac68?auto=format&fit=crop&w=900&q=85', true)
+    (1, 1, 1, 'Rice Meals', 'Chicken Adobo Bowl', 'Tender chicken braised in garlic-soy vinegar with jasmine rice', 75.00, 8, '4.9', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQbOudj4TjCn-ub5u5aNIvOxQ65uMwjUV6OKWGUWC6e5Q&s=10', true),
+    (2, 1, 1, 'Rice Meals', 'Crispy Fried Chicken', 'Golden spiced chicken thigh with savory gravy and garlic rice', 85.00, 10, '4.8', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTnsQBBRVpnHh-kPNaTtJ5oLorgLvFi6wOr62D60XIyhg&s=10', true),
+    (3, 1, 1, 'Rice Meals', 'Fresh Veggie Rice Bowl', 'Wok-tossed market vegetables, fried tofu, and seasoned garlic rice', 65.00, 7, '4.7', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQskG_rlJ1pH1zfTODxZBl-7wfDB-urQ8cCeSIGkD57wQ&s=10', true),
+    (4, 1, 2, 'Breakfast', 'Beef Tapa Silog', 'Marinated cured beef sirloin with sunny fried egg and garlic rice', 80.00, 9, '4.8', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEj3p9Xy0UW4FzRrVH6rDYo9MdtfnuIFnTo6FsAYTyuA&s=10', true),
+    (5, 2, 3, 'Snacks', 'Classic Pork Siomai', 'Four steamed pork-shrimp dumplings with garlic chili oil', 45.00, 5, '4.9', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJvW03OHi_PyDT9yrNmIkVVUHK1Xs7vJhz0IO3J9n7pA&s=10', true),
+    (6, 2, 4, 'Drinks', 'Chilled Calamansi Juice', 'Freshly extracted native lime, honey, and crushed iced water', 30.00, 3, '4.6', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS8lD-OSljoY0bE0bVFndmdmcma1MEVl8cK7vpBFa0g0A&s=10', true)
   ON CONFLICT (id) DO UPDATE SET 
     name = EXCLUDED.name, 
     price = EXCLUDED.price,
