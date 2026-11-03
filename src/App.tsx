@@ -1072,7 +1072,7 @@ export default function App() {
   const [itemFormStallId, setItemFormStallId] = useState(1)
   const [itemFormPrepTime, setItemFormPrepTime] = useState(10)
   const [itemFormImage, setItemFormImage] = useState(
-    "https://images.unsplash.com/photo-1562748762-77b7c4633c83?auto=format&fit=crop&w=900&q=85",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQbOudj4TjCn-ub5u5aNIvOxQ65uMwjUV6OKWGUWC6e5Q&s=10",
   )
   const [itemFormImageFile, setItemFormImageFile] = useState<File | null>(null)
   const [itemFormImagePreview, setItemFormImagePreview] = useState("")
