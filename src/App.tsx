@@ -1508,8 +1508,8 @@ export default function App() {
     setForgotError("")
     setForgotNotice("")
     const entered = forgotOtp.trim().replace(/\D/g, "")
-    if (!entered || entered.length < 6) {
-      setForgotError("Please enter the complete verification code.")
+    if (!entered || entered.length !== 6) {
+      setForgotError("Please enter the complete 6-digit verification code.")
       return
     }
 
@@ -1669,8 +1669,8 @@ export default function App() {
     e.preventDefault()
     setRegVerifyError("")
     const entered = regOtp.trim().replace(/\D/g, "")
-    if (!entered || entered.length < 6) {
-      setRegVerifyError("Please enter the complete verification code.")
+    if (!entered || entered.length !== 6) {
+      setRegVerifyError("Please enter the complete 6-digit verification code.")
       return
     }
 
@@ -2911,23 +2911,23 @@ export default function App() {
                             style={{
                               fontSize: "11px",
                               color:
-                                forgotOtp.length >= 6
+                                forgotOtp.length === 6
                                   ? "var(--primary)"
                                   : "var(--muted)",
                               fontWeight: 600,
                             }}
                           >
-                            {forgotOtp.length}/8 digits
+                            {forgotOtp.length}/6 digits
                           </span>
                         </div>
                         <input
                           type="text"
-                          maxLength={8}
+                          maxLength={6}
                           value={forgotOtp}
                           onChange={(e) =>
-                            setForgotOtp(e.target.value.replace(/\D/g, ""))
+                            setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
                           }
-                          placeholder="• • • • • • • •"
+                          placeholder="• • • • • •"
                           style={{
                             textAlign: "center",
                             fontSize: "20px",
@@ -3466,23 +3466,23 @@ export default function App() {
                         style={{
                           fontSize: "11px",
                           color:
-                            regOtp.length >= 6
+                            regOtp.length === 6
                               ? "var(--primary)"
                               : "var(--muted)",
                           fontWeight: 600,
                         }}
                       >
-                        {regOtp.length}/8 digits
+                        {regOtp.length}/6 digits
                       </span>
                     </div>
                     <input
                       type="text"
-                      maxLength={8}
+                      maxLength={6}
                       value={regOtp}
                       onChange={(e) =>
-                        setRegOtp(e.target.value.replace(/\D/g, ""))
+                        setRegOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
                       }
-                      placeholder="• • • • • • • •"
+                      placeholder="• • • • • •"
                       style={{
                         textAlign: "center",
                         fontSize: "20px",
