@@ -487,6 +487,33 @@ export const supabase = {
       } catch {}
     }
 
+    // 1. Fetch remote audit logs of deleted profiles so deletions persist across other tabs, PCs, and mobiles
+    try {
+      const auditRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/audit_logs?table_name=eq.profiles&action=eq.DELETE&select=record_id,change_summary`,
+        { headers },
+      )
+      if (auditRes.ok) {
+        const logs = await auditRes.json()
+        if (Array.isArray(logs)) {
+          for (const l of logs) {
+            if (l.record_id) {
+              deletedSet.add(String(l.record_id).toLowerCase().trim())
+            }
+            if (
+              l.change_summary &&
+              typeof l.change_summary === "string" &&
+              l.change_summary.startsWith("DELETED_PROFILE:")
+            ) {
+              const parts = l.change_summary.split(":")
+              if (parts[1]) deletedSet.add(parts[1].toLowerCase().trim())
+              if (parts[2]) deletedSet.add(parts[2].toLowerCase().trim())
+            }
+          }
+        }
+      }
+    } catch {}
+
     const isDeleted = (p: Partial<Profile>) => {
       const pid = (p.id || "").toLowerCase().trim()
       const sid = (p.student_id || "").toLowerCase().trim()
@@ -507,9 +534,26 @@ export const supabase = {
       if (res.ok) {
         const data = await res.json()
         if (Array.isArray(data) && data.length > 0) {
-          remoteData = data.filter((p) => !isDeleted(p))
+          data.forEach((p) => {
+            if (p.is_active === false) {
+              if (p.id) deletedSet.add(String(p.id).toLowerCase().trim())
+              if (p.student_id)
+                deletedSet.add(String(p.student_id).toLowerCase().trim())
+              if (p.email)
+                deletedSet.add(String(p.email).toLowerCase().trim())
+            }
+          })
+          remoteData = data.filter((p) => p.is_active !== false && !isDeleted(p))
         }
       }
+    } catch {}
+
+    // Persist updated deletedSet to local storage for instant offline/re-render filtering
+    try {
+      localStorage.setItem(
+        "smartbite_deleted_profiles",
+        JSON.stringify(Array.from(deletedSet)),
+      )
     } catch {}
 
     const saved = localStorage.getItem("smartbite_profiles")
@@ -584,7 +628,7 @@ export const supabase = {
       middle_name: middleName,
       last_name: lastName,
       full_name: fullName,
-      grade_or_dept: profile.grade_or_dept || "Grade 12 - General",
+      grade_or_dept: profile.grade_or_dept || "",
       role: profile.role || "student",
       stall_id: profile.stall_id,
       balance: profile.balance ?? 500.0,
@@ -707,7 +751,27 @@ export const supabase = {
       } catch {}
     }
 
-    // 3. Delete from Supabase remote database matching both id and student_id
+    // 3. Mark inactive in Supabase remote database in case foreign keys prevent hard DELETE
+    try {
+      const patchConditions: string[] = []
+      if (cleanId) patchConditions.push(`id=eq.${encodeURIComponent(cleanId)}`)
+      if (cleanStudentId)
+        patchConditions.push(
+          `student_id=eq.${encodeURIComponent(cleanStudentId)}`,
+        )
+      for (const cond of patchConditions) {
+        await fetch(`${SUPABASE_URL}/rest/v1/profiles?${cond}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          }),
+        })
+      }
+    } catch {}
+
+    // 4. Delete from Supabase remote database matching both id and student_id
     try {
       const deleteConditions: string[] = []
       if (cleanId) {
@@ -732,6 +796,26 @@ export const supabase = {
     } catch (err) {
       console.error("Remote profile deletion error:", err)
     }
+
+    // 5. Insert an audit log in Supabase so other tabs, PCs, and mobiles fetch this deletion!
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/audit_logs`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          table_name: "profiles",
+          record_id: cleanStudentId || cleanId,
+          action: "DELETE",
+          performed_by: "admin",
+          change_summary: `DELETED_PROFILE:${cleanStudentId}:${cleanId}`,
+          new_data: {
+            is_deleted: true,
+            student_id: cleanStudentId,
+            id: cleanId,
+          },
+        }),
+      })
+    } catch {}
   },
 
   async changePassword(

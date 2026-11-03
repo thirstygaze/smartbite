@@ -692,6 +692,19 @@ a {
 }
 
 /* Top Navigation Bar */
+.topbar-left-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.mobile-menu-btn {
+  display: none;
+}
+.sidebar-backdrop {
+  display: none;
+}
+
 .app-topbar {
   height: 64px;
   background: rgba(251, 251, 249, 0.85);
@@ -1411,18 +1424,188 @@ a {
   }
 }
 
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVENESS (FULLY ACCESSIBLE ON MOBILE SMARTPHONES & TABLETS)
+   ========================================================================== */
 @media (max-width: 768px) {
+  /* Mobile Drawer Sidebar Navigation */
   .app-sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 290px;
+    max-width: 85vw;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 6px 0 28px rgba(0, 0, 0, 0.28);
+    overflow-y: auto;
+  }
+  .app-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 27, 21, 0.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 999;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: #FFFFFF;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .mobile-menu-btn:hover {
+    background: var(--bg-subtle);
+    border-color: var(--primary);
+  }
+
+  /* Topbar Mobile Layout */
+  .app-topbar {
+    padding: 0 14px;
+    height: 58px;
+  }
+  .topbar-breadcrumb {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 170px;
+  }
+  .topbar-breadcrumb span:first-child,
+  .breadcrumb-slash {
     display: none;
   }
-  .app-topbar {
-    padding: 0 16px;
+  .topbar-actions {
+    gap: 8px;
   }
+  .status-pill-open span:last-child {
+    display: none;
+  }
+  .status-pill-open {
+    padding: 6px 9px;
+  }
+
+  /* Main Viewport & Grid Adjustments */
   .main-content-scroll {
-    padding: 20px 16px;
+    padding: 16px 12px 48px;
+  }
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .dashboard-header-text h1 {
+    font-size: 26px;
   }
   .stats-cards-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .dashboard-2col-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .card-panel-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+
+  /* Food Cards on Mobile */
+  .food-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+  }
+  .kds-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* Modals on Mobile */
+  .crud-modal-overlay,
+  .crud-modal-backdrop {
+    padding: 12px;
+  }
+  .crud-modal,
+  .crud-modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 94vh;
+    border-radius: var(--radius-md);
+  }
+  .crud-modal-header {
+    padding: 14px 16px;
+  }
+  .crud-modal-body {
+    padding: 16px;
+  }
+  .crud-modal-footer {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+
+  /* Forms & Auth on Mobile */
+  .name-inputs-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .modal-role-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .auth-page {
+    padding: 24px 12px;
+  }
+  .auth-card {
+    padding: 24px 18px 22px;
+    border-radius: 18px;
+  }
+  .cart-slide-drawer {
+    width: 100%;
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .food-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .topbar-breadcrumb {
+    max-width: 130px;
+  }
+  .status-pill-open {
+    display: none;
+  }
+  .topbar-actions {
+    gap: 6px;
+  }
+  .auth-header h1 {
+    font-size: 28px;
+  }
+  .icon-action-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .cart-top-btn {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
   }
 }
 

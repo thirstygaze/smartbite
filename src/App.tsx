@@ -13,7 +13,7 @@ import {
 } from "./supabase"
 import { canteenApi } from "./services/canteenApi"
 
-type IconName = "home" | "receipt" | "clock" | "bell" | "search" | "bag" | "minus" | "plus" | "arrow" | "x" | "check" | "database" | "chef" | "shield" | "refresh" | "store" | "users" | "edit" | "trash" | "chevron-down" | "sparkle" | "eye" | "eye-off" | "school" | "logout" | "grid" | "key" | "lock" | "mail" | "info" | "list"
+type IconName = "home" | "receipt" | "clock" | "bell" | "search" | "bag" | "minus" | "plus" | "arrow" | "x" | "check" | "database" | "chef" | "shield" | "refresh" | "store" | "users" | "edit" | "trash" | "chevron-down" | "sparkle" | "eye" | "eye-off" | "school" | "logout" | "grid" | "key" | "lock" | "mail" | "info" | "list" | "menu" | "copy"
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -187,6 +187,19 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <line x1="3" y1="6" x2="3.01" y2="6" />
         <line x1="3" y1="12" x2="3.01" y2="12" />
         <line x1="3" y1="18" x2="3.01" y2="18" />
+      </>
+    ),
+    menu: (
+      <>
+        <line x1="4" y1="6" x2="20" y2="6" />
+        <line x1="4" y1="12" x2="20" y2="12" />
+        <line x1="4" y1="18" x2="20" y2="18" />
+      </>
+    ),
+    copy: (
+      <>
+        <rect width="13" height="13" x="9" y="9" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
       </>
     ),
   }
@@ -528,6 +541,15 @@ export default function App() {
   // Admin User Management & Create User Modal (Only Admin can create Stall, Admin, Staff, Customer)
   const [adminCreateUserModalOpen, setAdminCreateUserModalOpen] =
     useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [createdAccountSummary, setCreatedAccountSummary] = useState<{
+    id: string
+    student_id: string
+    email: string
+    full_name: string
+    role: UserRole
+    password?: string
+  } | null>(null)
   const [newRole, setNewRole] = useState<UserRole>("student")
   const [newUserId, setNewUserId] = useState("")
   const [newUserEmail, setNewUserEmail] = useState("")
@@ -1176,6 +1198,20 @@ export default function App() {
     refreshAllData()
   }, [currentUser.role])
 
+  // Multi-tab sync: instantly reflect user deletions / creations across other open tabs
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (
+        e.key === "smartbite_deleted_profiles" ||
+        e.key === "smartbite_profiles"
+      ) {
+        refreshAllData()
+      }
+    }
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
+
   // Polling for live KDS and orders (every 3.5s)
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -1608,7 +1644,7 @@ export default function App() {
       middle_name: regMiddleName.trim(),
       last_name: regLastName.trim(),
       full_name: fullName,
-      grade_or_dept: "Student",
+      grade_or_dept: "",
       role: "student" as UserRole,
       phone_number: cleanedPhone,
       password: regPassword,
@@ -1798,7 +1834,7 @@ export default function App() {
       newMiddleName.trim() ? newMiddleName.trim() + " " : ""
     }${newLastName.trim()}`.trim()
 
-    await canteenApi.auth.createProfile({
+    const createdAccount = await canteenApi.auth.createProfile({
       student_id: newUserId.trim(),
       email: newUserEmail.trim().toLowerCase(),
       first_name: newFirstName.trim(),
@@ -1806,12 +1842,7 @@ export default function App() {
       last_name: newLastName.trim(),
       full_name: fullName,
       phone_number: newPhone.trim(),
-      grade_or_dept:
-        newRole === "student"
-          ? "Student"
-          : newRole === "staff"
-            ? "Staff"
-            : "Administration",
+      grade_or_dept: "",
       role: newRole,
       stall_id:
         newRole === "staff" || newRole === "stall_manager"
@@ -1825,24 +1856,19 @@ export default function App() {
       is_email_verified: true,
     })
 
+    const summaryData = {
+      id: createdAccount.id || crypto.randomUUID(),
+      student_id: newUserId.trim(),
+      email: newUserEmail.trim().toLowerCase(),
+      full_name: fullName,
+      role: newRole,
+      password: newPassword.trim(),
+    }
+    setCreatedAccountSummary(summaryData)
     setAdminUserModalSuccess(
       `✓ Account created for ${fullName} (${newRole}) with ID ${newUserId.trim()}.`,
     )
     await refreshAllData()
-    setTimeout(() => {
-      setAdminCreateUserModalOpen(false)
-      setNewUserId("")
-      setNewUserEmail("")
-      setNewFirstName("")
-      setNewMiddleName("")
-      setNewLastName("")
-      setNewPhone("")
-      setNewPassword("")
-      setShowNewPassword(false)
-      setCreateNewStallCheckbox(false)
-      setNewStallName("")
-      setAdminUserModalSuccess("")
-    }, 1200)
   }
 
   // Admin Reset User Password
@@ -3557,8 +3583,16 @@ export default function App() {
   // =========================================================================
   return (
     <div className="app-layout">
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* 2A. LEFT SIDEBAR */}
-      <aside className="app-sidebar">
+      <aside className={`app-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
         {/* Brand Header */}
         <div className="sidebar-brand-row">
           <img
@@ -3607,7 +3641,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   adminNavTab === "overview" ? "active" : ""
                 }`}
-                onClick={() => setAdminNavTab("overview")}
+                onClick={() => { setAdminNavTab("overview"); setMobileMenuOpen(false); }}
               >
                 <Icon name="grid" size={17} />
                 <span>Admin dashboard</span>
@@ -3616,7 +3650,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   adminNavTab === "orders" ? "active" : ""
                 }`}
-                onClick={() => setAdminNavTab("orders")}
+                onClick={() => { setAdminNavTab("orders"); setMobileMenuOpen(false); }}
               >
                 <Icon name="receipt" size={17} />
                 <span>Orders</span>
@@ -3626,7 +3660,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   adminNavTab === "menu" ? "active" : ""
                 }`}
-                onClick={() => setAdminNavTab("menu")}
+                onClick={() => { setAdminNavTab("menu"); setMobileMenuOpen(false); }}
               >
                 <Icon name="bag" size={17} />
                 <span>Menu</span>
@@ -3636,7 +3670,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   adminNavTab === "inventory" ? "active" : ""
                 }`}
-                onClick={() => setAdminNavTab("inventory")}
+                onClick={() => { setAdminNavTab("inventory"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
                 <span>Inventory</span>
@@ -3645,7 +3679,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   adminNavTab === "users" ? "active" : ""
                 }`}
-                onClick={() => setAdminNavTab("users")}
+                onClick={() => { setAdminNavTab("users"); setMobileMenuOpen(false); }}
               >
                 <Icon name="users" size={17} />
                 <span>Team / Users</span>
@@ -3719,7 +3753,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   branchNavTab === "overview" ? "active" : ""
                 }`}
-                onClick={() => setBranchNavTab("overview")}
+                onClick={() => { setBranchNavTab("overview"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
                 <span>2 Branches Overview</span>
@@ -3728,7 +3762,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   branchNavTab === "stall_1" ? "active" : ""
                 }`}
-                onClick={() => setBranchNavTab("stall_1")}
+                onClick={() => { setBranchNavTab("stall_1"); setMobileMenuOpen(false); }}
               >
                 <Icon name="home" size={17} />
                 <span>Branch #1: Main Kitchen</span>
@@ -3737,7 +3771,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   branchNavTab === "stall_2" ? "active" : ""
                 }`}
-                onClick={() => setBranchNavTab("stall_2")}
+                onClick={() => { setBranchNavTab("stall_2"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
                 <span>Branch #2: Snack Bar</span>
@@ -3752,7 +3786,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   studentNavTab === "menu" ? "active" : ""
                 }`}
-                onClick={() => setStudentNavTab("menu")}
+                onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
               >
                 <Icon name="home" size={17} />
                 <span>Food Catalog</span>
@@ -3761,7 +3795,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   studentNavTab === "active_ticket" ? "active" : ""
                 }`}
-                onClick={() => setStudentNavTab("active_ticket")}
+                onClick={() => { setStudentNavTab("active_ticket"); setMobileMenuOpen(false); }}
               >
                 <Icon name="receipt" size={17} />
                 <span>Active Ticket</span>
@@ -3771,7 +3805,7 @@ export default function App() {
                 className={`sidebar-nav-btn ${
                   studentNavTab === "history" ? "active" : ""
                 }`}
-                onClick={() => setStudentNavTab("history")}
+                onClick={() => { setStudentNavTab("history"); setMobileMenuOpen(false); }}
               >
                 <Icon name="clock" size={17} />
                 <span>Order History</span>
@@ -3920,10 +3954,20 @@ export default function App() {
 
         {/* Topbar */}
         <header className="app-topbar">
-          <div className="topbar-breadcrumb">
-            <span>{activeCampus.name}</span>
-            <span>/</span>
-            <strong>
+          <div className="topbar-left-group">
+            <button
+              type="button"
+              className="mobile-menu-btn"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              title="Navigation Menu"
+            >
+              <Icon name={mobileMenuOpen ? "x" : "menu"} size={19} />
+            </button>
+            <div className="topbar-breadcrumb">
+              <span>{activeCampus.name}</span>
+              <span className="breadcrumb-slash">/</span>
+              <strong>
               {currentUser.role === "admin"
                 ? "Admin dashboard"
                 : currentUser.role === "staff"
@@ -3935,6 +3979,7 @@ export default function App() {
                     : "Student canteen"}
             </strong>
           </div>
+        </div>
 
           <div className="topbar-actions">
             {/* Live Open Status Pill */}
@@ -4355,7 +4400,7 @@ export default function App() {
                   <div className="shortcuts-row">
                     <div
                       className="shortcut-card"
-                      onClick={() => setAdminNavTab("orders")}
+                      onClick={() => { setAdminNavTab("orders"); setMobileMenuOpen(false); }}
                     >
                       <div className="shortcut-meta">
                         <strong>Order activity</strong>
@@ -4372,7 +4417,7 @@ export default function App() {
                     </div>
                     <div
                       className="shortcut-card"
-                      onClick={() => setAdminNavTab("users")}
+                      onClick={() => { setAdminNavTab("users"); setMobileMenuOpen(false); }}
                     >
                       <div className="shortcut-meta">
                         <strong>Staff directory</strong>
@@ -4382,7 +4427,7 @@ export default function App() {
                     </div>
                     <div
                       className="shortcut-card"
-                      onClick={() => setAdminNavTab("menu")}
+                      onClick={() => { setAdminNavTab("menu"); setMobileMenuOpen(false); }}
                     >
                       <div className="shortcut-meta">
                         <strong>Menu availability</strong>
@@ -4451,7 +4496,7 @@ export default function App() {
                           </div>
                           <button
                             className="btn-secondary"
-                            onClick={() => setAdminNavTab("orders")}
+                            onClick={() => { setAdminNavTab("orders"); setMobileMenuOpen(false); }}
                             style={{ fontSize: "11px", padding: "4px 10px" }}
                           >
                             View all &rarr;
@@ -4616,6 +4661,84 @@ export default function App() {
                       </span>
                     </button>
                   </div>
+                  {createdAccountSummary && (
+                    <div
+                      style={{
+                        background: "#ecfdf5",
+                        border: "1px solid #a7f3d0",
+                        borderRadius: "10px",
+                        padding: "12px 18px",
+                        margin: "0 24px 16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "10px",
+                        boxShadow: "0 2px 6px rgba(16, 185, 129, 0.08)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: "#059669",
+                            color: "#fff",
+                            fontSize: "10px",
+                            fontWeight: 800,
+                            padding: "3px 8px",
+                            borderRadius: "6px",
+                            letterSpacing: "0.5px",
+                          }}
+                        >
+                          NEWLY CREATED ACCOUNT
+                        </span>
+                        <span style={{ fontSize: "13px", color: "#065f46" }}>
+                          <strong>ID:</strong>{" "}
+                          <code
+                            style={{
+                              background: "#d1fae5",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {createdAccountSummary.student_id}
+                          </code>
+                        </span>
+                        <span style={{ fontSize: "13px", color: "#065f46" }}>
+                          <strong>Email:</strong>{" "}
+                          <code
+                            style={{
+                              background: "#d1fae5",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {createdAccountSummary.email || "No email assigned"}
+                          </code>
+                        </span>
+                        <span style={{ fontSize: "13px", color: "#065f46" }}>
+                          <strong>Name:</strong> {createdAccountSummary.full_name} ({createdAccountSummary.role})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: "4px 10px", fontSize: "11px" }}
+                        onClick={() => setCreatedAccountSummary(null)}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+
                   <div className="data-table-wrap">
                     <table className="data-table">
                       <thead>
@@ -5062,7 +5185,6 @@ export default function App() {
                           <th>Full Name (First, Middle, Last)</th>
                           <th>Role Tier</th>
                           <th>Assigned Stall</th>
-                          <th>Grade / Dept</th>
                           <th>Wallet Balance</th>
                           <th>Status</th>
                           <th>Admin Actions</th>
@@ -7470,7 +7592,7 @@ export default function App() {
                                 alignItems: "center",
                                 gap: "4px",
                               }}
-                              onClick={() => setBranchNavTab("overview")}
+                              onClick={() => { setBranchNavTab("overview"); setMobileMenuOpen(false); }}
                             >
                               <Icon name="arrow" size={12} />
                               <span>All Branches</span>
@@ -8485,7 +8607,7 @@ export default function App() {
                   className={`filter-pill-btn ${
                     studentNavTab === "menu" ? "active" : ""
                   }`}
-                  onClick={() => setStudentNavTab("menu")}
+                  onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
                 >
                   Food Menu Catalog
                 </button>
@@ -8493,7 +8615,7 @@ export default function App() {
                   className={`filter-pill-btn ${
                     studentNavTab === "active_ticket" ? "active" : ""
                   }`}
-                  onClick={() => setStudentNavTab("active_ticket")}
+                  onClick={() => { setStudentNavTab("active_ticket"); setMobileMenuOpen(false); }}
                 >
                   Live Active Ticket {activeOrder && "●"}
                 </button>
@@ -8501,7 +8623,7 @@ export default function App() {
                   className={`filter-pill-btn ${
                     studentNavTab === "history" ? "active" : ""
                   }`}
-                  onClick={() => setStudentNavTab("history")}
+                  onClick={() => { setStudentNavTab("history"); setMobileMenuOpen(false); }}
                 >
                   Order History
                 </button>
@@ -8587,7 +8709,7 @@ export default function App() {
                       </div>
                       <button
                         className="btn-secondary"
-                        onClick={() => setStudentNavTab("active_ticket")}
+                        onClick={() => { setStudentNavTab("active_ticket"); setMobileMenuOpen(false); }}
                         style={{ whiteSpace: "nowrap" }}
                       >
                         Track Ticket &rarr;
@@ -9208,7 +9330,7 @@ export default function App() {
                           <button
                             type="button"
                             className="btn-secondary"
-                            onClick={() => setStudentNavTab("menu")}
+                            onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
                             style={{ fontSize: "13px" }}
                           >
                             &larr; Back to Menu
@@ -9217,7 +9339,7 @@ export default function App() {
                             <button
                               type="button"
                               className="auth-btn-primary"
-                              onClick={() => setStudentNavTab("menu")}
+                              onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
                               style={{ fontSize: "13px", padding: "8px 16px" }}
                             >
                               Order Again
@@ -9237,7 +9359,7 @@ export default function App() {
                       <p>You have no active orders queued right now.</p>
                       <button
                         className="auth-btn-primary"
-                        onClick={() => setStudentNavTab("menu")}
+                        onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
                         style={{ maxWidth: "200px", margin: "14px auto 0" }}
                       >
                         Go to Menu
@@ -10175,6 +10297,271 @@ export default function App() {
               </button>
             </div>
 
+            {createdAccountSummary ? (
+              <div className="crud-modal-body" style={{ padding: "28px 24px" }}>
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "50%",
+                    background: "#dcfce7",
+                    color: "#15803d",
+                    display: "grid",
+                    placeItems: "center",
+                    margin: "0 auto 14px",
+                  }}
+                >
+                  <Icon name="check" size={28} />
+                </div>
+                <h3
+                  style={{
+                    textAlign: "center",
+                    margin: "0 0 6px",
+                    fontFamily: "var(--font-serif)",
+                    fontSize: "22px",
+                  }}
+                >
+                  Account Created Successfully!
+                </h3>
+                <p
+                  style={{
+                    textAlign: "center",
+                    color: "var(--muted)",
+                    fontSize: "13px",
+                    margin: "0 0 20px",
+                  }}
+                >
+                  The new user account has been registered. Review and copy the account ID and email below:
+                </p>
+
+                <div
+                  style={{
+                    background: "var(--bg-subtle)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "10px",
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <small
+                        style={{
+                          color: "var(--muted)",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          display: "block",
+                        }}
+                      >
+                        User / Student ID Number
+                      </small>
+                      <span
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--primary)",
+                        }}
+                      >
+                        {createdAccountSummary.student_id}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{
+                        padding: "5px 10px",
+                        fontSize: "11px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(createdAccountSummary.student_id);
+                        alert(`Copied ID "${createdAccountSummary.student_id}" to clipboard!`);
+                      }}
+                    >
+                      <Icon name="copy" size={13} /> Copy ID
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      borderTop: "1px solid var(--line)",
+                      paddingTop: "12px",
+                    }}
+                  >
+                    <div>
+                      <small
+                        style={{
+                          color: "var(--muted)",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          display: "block",
+                        }}
+                      >
+                        Registered Email
+                      </small>
+                      <span style={{ fontSize: "14px", fontWeight: 600 }}>
+                        {createdAccountSummary.email || "No email assigned"}
+                      </span>
+                    </div>
+                    {createdAccountSummary.email && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{
+                          padding: "5px 10px",
+                          fontSize: "11px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                        onClick={() => {
+                          navigator.clipboard?.writeText(createdAccountSummary.email);
+                          alert(`Copied Email "${createdAccountSummary.email}" to clipboard!`);
+                        }}
+                      >
+                        <Icon name="copy" size={13} /> Copy Email
+                      </button>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      borderTop: "1px solid var(--line)",
+                      paddingTop: "12px",
+                    }}
+                  >
+                    <small
+                      style={{
+                        color: "var(--muted)",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        display: "block",
+                      }}
+                    >
+                      Full Name
+                    </small>
+                    <span style={{ fontSize: "14px", fontWeight: 600 }}>
+                      {createdAccountSummary.full_name}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      borderTop: "1px solid var(--line)",
+                      paddingTop: "12px",
+                    }}
+                  >
+                    <small
+                      style={{
+                        color: "var(--muted)",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        display: "block",
+                      }}
+                    >
+                      Account Role
+                    </small>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {createdAccountSummary.role}
+                    </span>
+                  </div>
+
+                  {createdAccountSummary.password && (
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--line)",
+                        paddingTop: "12px",
+                      }}
+                    >
+                      <small
+                        style={{
+                          color: "var(--muted)",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          display: "block",
+                        }}
+                      >
+                        Initial Password
+                      </small>
+                      <span
+                        style={{
+                          fontSize: "14px",
+                          fontFamily: "var(--font-mono)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {createdAccountSummary.password}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    marginTop: "20px",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      setCreatedAccountSummary(null);
+                      setNewUserId("");
+                      setNewUserEmail("");
+                      setNewFirstName("");
+                      setNewMiddleName("");
+                      setNewLastName("");
+                      setNewPhone("");
+                      setNewPassword("");
+                      setShowNewPassword(false);
+                      setCreateNewStallCheckbox(false);
+                      setNewStallName("");
+                      setAdminUserModalSuccess("");
+                    }}
+                  >
+                    + Create Another Account
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-btn-primary"
+                    style={{ width: "auto", padding: "0 20px", height: "38px" }}
+                    onClick={() => {
+                      setAdminCreateUserModalOpen(false);
+                    }}
+                  >
+                    Done &amp; View Users
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleAdminCreateUser}>
               <div
                 className="crud-modal-body"
@@ -10584,6 +10971,7 @@ export default function App() {
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}
