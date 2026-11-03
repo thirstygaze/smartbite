@@ -2499,15 +2499,45 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              className="auth-btn-primary"
-              onClick={() => {
-                setAuthStep("signin")
-                setAuthError("")
-              }}
-            >
-              Sign in to continue <span>&rarr;</span>
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                className="auth-btn-primary"
+                onClick={() => {
+                  setAuthStep("signin")
+                  setAuthError("")
+                }}
+              >
+                Sign in to continue <span>&rarr;</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthStep("signup")
+                  setAuthError("")
+                  setAuthNotice("")
+                }}
+                style={{
+                  width: "100%",
+                  height: "48px",
+                  borderRadius: "var(--radius-md)",
+                  background: "#FFFFFF",
+                  border: "1.5px solid var(--primary)",
+                  color: "var(--primary)",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <Icon name="users" size={16} />
+                <span>Register New Account</span>
+              </button>
+            </div>
 
             {/* Feature bullets matching Screenshot 1 */}
             <div className="welcome-features">
