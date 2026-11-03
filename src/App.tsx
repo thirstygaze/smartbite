@@ -3682,7 +3682,7 @@ export default function App() {
               <button
                 className={`sidebar-nav-btn ${staffNavTab === "kds" ? "active" : ""
                   }`}
-                onClick={() => setStaffNavTab("kds")}
+                onClick={() => { setStaffNavTab("kds"); setMobileMenuOpen(false); }}
               >
                 <Icon name="chef" size={17} />
                 <span>Live Queue</span>
@@ -3696,7 +3696,7 @@ export default function App() {
               <button
                 className={`sidebar-nav-btn ${staffNavTab === "orders" ? "active" : ""
                   }`}
-                onClick={() => setStaffNavTab("orders")}
+                onClick={() => { setStaffNavTab("orders"); setMobileMenuOpen(false); }}
               >
                 <Icon name="receipt" size={17} />
                 <span>Orders</span>
@@ -3713,7 +3713,7 @@ export default function App() {
               <button
                 className={`sidebar-nav-btn ${staffNavTab === "menu_crud" ? "active" : ""
                   }`}
-                onClick={() => setStaffNavTab("menu_crud")}
+                onClick={() => { setStaffNavTab("menu_crud"); setMobileMenuOpen(false); }}
               >
                 <Icon name="edit" size={17} />
                 <span>Menu Items </span>
@@ -3722,7 +3722,7 @@ export default function App() {
               <button
                 className={`sidebar-nav-btn ${staffNavTab === "inventory_crud" ? "active" : ""
                   }`}
-                onClick={() => setStaffNavTab("inventory_crud")}
+                onClick={() => { setStaffNavTab("inventory_crud"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
                 <span>Ingredient Stocks</span>
