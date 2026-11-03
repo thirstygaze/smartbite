@@ -247,7 +247,7 @@ function playNotificationSound() {
     gain.connect(ctx.destination)
     osc.start()
     osc.stop(ctx.currentTime + 0.4)
-  } catch {}
+  } catch { }
 }
 
 // =========================================================================
@@ -467,7 +467,7 @@ export default function App() {
         const parsed = JSON.parse(saved)
         if (parsed && parsed.student_id) return true
       }
-    } catch {}
+    } catch { }
     return false
   })
   const [authStep, setAuthStep] = useState<"welcome" | "signin" | "signup">(
@@ -634,7 +634,7 @@ export default function App() {
       if (saved !== null) {
         return JSON.parse(saved)
       }
-    } catch {}
+    } catch { }
     return [
       {
         id: "notif-1",
@@ -673,7 +673,7 @@ export default function App() {
         "smartbite_notifications",
         JSON.stringify(notifications),
       )
-    } catch {}
+    } catch { }
   }, [notifications])
 
   // Countdown timers for OTP email resend cooldowns
@@ -699,7 +699,7 @@ export default function App() {
     setNotifications([])
     try {
       localStorage.setItem("smartbite_notifications", JSON.stringify([]))
-    } catch {}
+    } catch { }
   }
 
   const handleDismissNotification = (id: string, e?: React.MouseEvent) => {
@@ -708,7 +708,7 @@ export default function App() {
       const updated = prev.filter((n) => n.id !== id)
       try {
         localStorage.setItem("smartbite_notifications", JSON.stringify(updated))
-      } catch {}
+      } catch { }
       return updated
     })
   }
@@ -732,7 +732,7 @@ export default function App() {
         "smartbite_session_user",
         JSON.stringify(updatedUser),
       )
-    } catch {}
+    } catch { }
     setCurrentUser(updatedUser)
     setUserProfiles((prev) =>
       prev.map((p) =>
@@ -808,7 +808,7 @@ export default function App() {
         const parsed = JSON.parse(saved)
         if (parsed && parsed.student_id) return parsed
       }
-    } catch {}
+    } catch { }
     return {
       id: "p-1",
       student_id: "2025-01234",
@@ -827,7 +827,7 @@ export default function App() {
           "smartbite_session_user",
           JSON.stringify(currentUser),
         )
-      } catch {}
+      } catch { }
     }
   }, [loggedIn, currentUser])
 
@@ -919,7 +919,7 @@ export default function App() {
       const updated = [newNotif, ...prev]
       try {
         localStorage.setItem("smartbite_notifications", JSON.stringify(updated))
-      } catch {}
+      } catch { }
       return updated
     })
 
@@ -945,27 +945,27 @@ export default function App() {
       if (nextStatus === "Completed") {
         await canteenApi.orders
           .updatePaymentStatus(orderId, "paid")
-          .catch(() => {})
+          .catch(() => { })
       }
       setActiveOrder((prev) =>
         prev && prev.id === orderId
           ? {
-              ...prev,
-              order_status: nextStatus,
-              ...(nextStatus === "Completed" ? { payment_status: "paid" } : {}),
-            }
+            ...prev,
+            order_status: nextStatus,
+            ...(nextStatus === "Completed" ? { payment_status: "paid" } : {}),
+          }
           : prev,
       )
       setAllOrders((prev) =>
         prev.map((o) =>
           o.id === orderId
             ? {
-                ...o,
-                order_status: nextStatus,
-                ...(nextStatus === "Completed"
-                  ? { payment_status: "paid" }
-                  : {}),
-              }
+              ...o,
+              order_status: nextStatus,
+              ...(nextStatus === "Completed"
+                ? { payment_status: "paid" }
+                : {}),
+            }
             : o,
         ),
       )
@@ -1146,23 +1146,23 @@ export default function App() {
             completedPending.map((o) =>
               canteenApi.orders.updatePaymentStatus(o.id, "paid"),
             ),
-          ).catch(() => {})
+          ).catch(() => { })
         }
       }
 
       const active =
         currentUser.role === "student"
           ? ordersData?.find(
-              (o) =>
-                o.student_number === currentUser.student_id &&
-                o.order_status !== "Completed" &&
-                o.order_status !== "Cancelled",
-            )
+            (o) =>
+              o.student_number === currentUser.student_id &&
+              o.order_status !== "Completed" &&
+              o.order_status !== "Cancelled",
+          )
           : ordersData?.find(
-              (o) =>
-                o.order_status !== "Completed" &&
-                o.order_status !== "Cancelled",
-            )
+            (o) =>
+              o.order_status !== "Completed" &&
+              o.order_status !== "Cancelled",
+          )
       if (active) {
         setActiveOrder(active)
       } else if (activeOrderRef.current?.id) {
@@ -1186,7 +1186,7 @@ export default function App() {
             if (fresh) {
               setCurrentUser((prev) => ({ ...prev, ...fresh }))
             }
-          } catch {}
+          } catch { }
         }
       }
     } catch (err) {
@@ -1236,7 +1236,7 @@ export default function App() {
             }
           }
         }
-      } catch {}
+      } catch { }
     }, 3500)
     return () => clearInterval(interval)
   }, [])
@@ -1320,7 +1320,7 @@ export default function App() {
           "smartbite_session_user",
           JSON.stringify(adminUser),
         )
-      } catch {}
+      } catch { }
       setCurrentUser(adminUser)
       setLoggedIn(true)
       setAuthError("")
@@ -1401,7 +1401,7 @@ export default function App() {
         "smartbite_session_user",
         JSON.stringify(resolvedUser),
       )
-    } catch {}
+    } catch { }
     setCurrentUser(resolvedUser)
     setLoggedIn(true)
     setAuthError("")
@@ -1517,7 +1517,7 @@ export default function App() {
     if (!check.ok) {
       setForgotError(
         check.error ||
-          "Incorrect verification code. Please check and try again.",
+        "Incorrect verification code. Please check and try again.",
       )
       return
     }
@@ -1633,9 +1633,8 @@ export default function App() {
       return
     }
 
-    const fullName = `${regFirstName.trim()} ${
-      regMiddleName.trim() ? regMiddleName.trim() + " " : ""
-    }${regLastName.trim()}`.trim()
+    const fullName = `${regFirstName.trim()} ${regMiddleName.trim() ? regMiddleName.trim() + " " : ""
+      }${regLastName.trim()}`.trim()
 
     const pending = {
       student_id: regStudentId.trim(),
@@ -1689,7 +1688,7 @@ export default function App() {
     if (!check.ok) {
       setRegVerifyError(
         check.error ||
-          "Incorrect verification code. Please check your email and try again.",
+        "Incorrect verification code. Please check your email and try again.",
       )
       return
     }
@@ -1830,9 +1829,8 @@ export default function App() {
       assignedStallId = createdStall.id
     }
 
-    const fullName = `${newFirstName.trim()} ${
-      newMiddleName.trim() ? newMiddleName.trim() + " " : ""
-    }${newLastName.trim()}`.trim()
+    const fullName = `${newFirstName.trim()} ${newMiddleName.trim() ? newMiddleName.trim() + " " : ""
+      }${newLastName.trim()}`.trim()
 
     const createdAccount = await canteenApi.auth.createProfile({
       student_id: newUserId.trim(),
@@ -1965,9 +1963,8 @@ export default function App() {
       return
     }
 
-    const fullName = `${editFirstName.trim()} ${
-      editMiddleName.trim() ? editMiddleName.trim() + " " : ""
-    }${editLastName.trim()}`.trim()
+    const fullName = `${editFirstName.trim()} ${editMiddleName.trim() ? editMiddleName.trim() + " " : ""
+      }${editLastName.trim()}`.trim()
 
     const updates: Partial<Profile> = {
       student_id: editUserId.trim(),
@@ -2042,7 +2039,7 @@ export default function App() {
           : item,
       )
       localStorage.setItem("smartbite_inventory", JSON.stringify(updated))
-    } catch {}
+    } catch { }
 
     setSyncToast(`✓ Updated ${itemName} stock to ${newStock} ${itemUnit}`)
     setTimeout(() => setSyncToast(""), 3000)
@@ -2087,7 +2084,7 @@ export default function App() {
         Number(i.id) === itemId ? { ...i, current_stock: newStock } : i,
       )
       localStorage.setItem("smartbite_inventory", JSON.stringify(updated))
-    } catch {}
+    } catch { }
 
     setSyncToast(
       `✓ Restocked +${amountToAdd} ${item.unit_of_measure} to ${item.item_name}! (Total: ${newStock})`,
@@ -2105,7 +2102,7 @@ export default function App() {
   const handleLogout = () => {
     try {
       localStorage.removeItem("smartbite_session_user")
-    } catch {}
+    } catch { }
     setLoggedIn(false)
     setAuthStep("welcome")
     setCart({})
@@ -2185,7 +2182,7 @@ export default function App() {
           "smartbite_inventory",
           JSON.stringify(updatedInventory),
         )
-      } catch {}
+      } catch { }
 
       // 2. If paying via wallet, deduct balance from profile
       let updatedBalance = studentBalance
@@ -2204,7 +2201,7 @@ export default function App() {
             "smartbite_session_user",
             JSON.stringify(updatedUser),
           )
-        } catch {}
+        } catch { }
         setCurrentUser(updatedUser)
         setUserProfiles((prev) =>
           prev.map((p) =>
@@ -2274,9 +2271,8 @@ export default function App() {
         "Order placed",
         isPayingWithWallet
           ? `Ticket #${orderId} (₱${subtotal}.00 paid via Canteen Wallet • Remaining Balance: ₱${updatedBalance.toFixed(2)}) sent to kitchen.`
-          : `Ticket #${orderId} (${orderItems.length} item${
-              orderItems.length > 1 ? "s" : ""
-            } • ₱${subtotal}.00) sent to kitchen. Status: Order placed.`,
+          : `Ticket #${orderId} (${orderItems.length} item${orderItems.length > 1 ? "s" : ""
+          } • ₱${subtotal}.00) sent to kitchen. Status: Order placed.`,
       )
       startKitchenProgression(orderId)
     } catch (err: any) {
@@ -2442,7 +2438,7 @@ export default function App() {
             )
           }
         }
-      } catch {}
+      } catch { }
 
       setSyncToast(
         `✓ ${item.name} marked as ${nextStatus ? "Available" : "Sold Out"}`,
@@ -2613,9 +2609,8 @@ export default function App() {
               <div className="role-segmented-grid">
                 <button
                   type="button"
-                  className={`role-segmented-btn ${
-                    chosenRole === "student" ? "active" : ""
-                  }`}
+                  className={`role-segmented-btn ${chosenRole === "student" ? "active" : ""
+                    }`}
                   onClick={() => handleSelectRole("student")}
                 >
                   <span className="role-icon">
@@ -2625,9 +2620,8 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className={`role-segmented-btn ${
-                    chosenRole === "staff" ? "active" : ""
-                  }`}
+                  className={`role-segmented-btn ${chosenRole === "staff" ? "active" : ""
+                    }`}
                   onClick={() => handleSelectRole("staff")}
                 >
                   <span className="role-icon">
@@ -2637,9 +2631,8 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className={`role-segmented-btn ${
-                    chosenRole === "admin" ? "active" : ""
-                  }`}
+                  className={`role-segmented-btn ${chosenRole === "admin" ? "active" : ""
+                    }`}
                   onClick={() => handleSelectRole("admin")}
                 >
                   <span className="role-icon">
@@ -3638,18 +3631,16 @@ export default function App() {
           {currentUser.role === "admin" && (
             <>
               <button
-                className={`sidebar-nav-btn ${
-                  adminNavTab === "overview" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${adminNavTab === "overview" ? "active" : ""
+                  }`}
                 onClick={() => { setAdminNavTab("overview"); setMobileMenuOpen(false); }}
               >
                 <Icon name="grid" size={17} />
                 <span>Admin dashboard</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  adminNavTab === "orders" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${adminNavTab === "orders" ? "active" : ""
+                  }`}
                 onClick={() => { setAdminNavTab("orders"); setMobileMenuOpen(false); }}
               >
                 <Icon name="receipt" size={17} />
@@ -3657,9 +3648,8 @@ export default function App() {
                 <span className="nav-badge">{allOrders.length}</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  adminNavTab === "menu" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${adminNavTab === "menu" ? "active" : ""
+                  }`}
                 onClick={() => { setAdminNavTab("menu"); setMobileMenuOpen(false); }}
               >
                 <Icon name="bag" size={17} />
@@ -3667,18 +3657,16 @@ export default function App() {
                 <span className="nav-badge">{items.length}</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  adminNavTab === "inventory" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${adminNavTab === "inventory" ? "active" : ""
+                  }`}
                 onClick={() => { setAdminNavTab("inventory"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
                 <span>Inventory</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  adminNavTab === "users" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${adminNavTab === "users" ? "active" : ""
+                  }`}
                 onClick={() => { setAdminNavTab("users"); setMobileMenuOpen(false); }}
               >
                 <Icon name="users" size={17} />
@@ -3692,9 +3680,8 @@ export default function App() {
           {currentUser.role === "staff" && (
             <>
               <button
-                className={`sidebar-nav-btn ${
-                  staffNavTab === "kds" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${staffNavTab === "kds" ? "active" : ""
+                  }`}
                 onClick={() => setStaffNavTab("kds")}
               >
                 <Icon name="chef" size={17} />
@@ -3707,9 +3694,8 @@ export default function App() {
                 </span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  staffNavTab === "orders" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${staffNavTab === "orders" ? "active" : ""
+                  }`}
                 onClick={() => setStaffNavTab("orders")}
               >
                 <Icon name="receipt" size={17} />
@@ -3725,9 +3711,8 @@ export default function App() {
                 </span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  staffNavTab === "menu_crud" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${staffNavTab === "menu_crud" ? "active" : ""
+                  }`}
                 onClick={() => setStaffNavTab("menu_crud")}
               >
                 <Icon name="edit" size={17} />
@@ -3735,9 +3720,8 @@ export default function App() {
                 <span className="nav-badge">{items.length}</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  staffNavTab === "inventory_crud" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${staffNavTab === "inventory_crud" ? "active" : ""
+                  }`}
                 onClick={() => setStaffNavTab("inventory_crud")}
               >
                 <Icon name="store" size={17} />
@@ -3750,27 +3734,24 @@ export default function App() {
           {currentUser.role === "stall_manager" && (
             <>
               <button
-                className={`sidebar-nav-btn ${
-                  branchNavTab === "overview" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${branchNavTab === "overview" ? "active" : ""
+                  }`}
                 onClick={() => { setBranchNavTab("overview"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
                 <span>2 Branches Overview</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  branchNavTab === "stall_1" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${branchNavTab === "stall_1" ? "active" : ""
+                  }`}
                 onClick={() => { setBranchNavTab("stall_1"); setMobileMenuOpen(false); }}
               >
                 <Icon name="home" size={17} />
                 <span>Branch #1: Main Kitchen</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  branchNavTab === "stall_2" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${branchNavTab === "stall_2" ? "active" : ""
+                  }`}
                 onClick={() => { setBranchNavTab("stall_2"); setMobileMenuOpen(false); }}
               >
                 <Icon name="store" size={17} />
@@ -3783,18 +3764,16 @@ export default function App() {
           {currentUser.role === "student" && (
             <>
               <button
-                className={`sidebar-nav-btn ${
-                  studentNavTab === "menu" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${studentNavTab === "menu" ? "active" : ""
+                  }`}
                 onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
               >
                 <Icon name="home" size={17} />
                 <span>Food Catalog</span>
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  studentNavTab === "active_ticket" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${studentNavTab === "active_ticket" ? "active" : ""
+                  }`}
                 onClick={() => { setStudentNavTab("active_ticket"); setMobileMenuOpen(false); }}
               >
                 <Icon name="receipt" size={17} />
@@ -3802,9 +3781,8 @@ export default function App() {
                 {activeOrder && <span className="nav-badge alert">LIVE</span>}
               </button>
               <button
-                className={`sidebar-nav-btn ${
-                  studentNavTab === "history" ? "active" : ""
-                }`}
+                className={`sidebar-nav-btn ${studentNavTab === "history" ? "active" : ""
+                  }`}
                 onClick={() => { setStudentNavTab("history"); setMobileMenuOpen(false); }}
               >
                 <Icon name="clock" size={17} />
@@ -3891,15 +3869,14 @@ export default function App() {
             }}
           >
             <div
-              className={`order-toast-icon ${
-                orderAlertToast.status === "Preparing"
+              className={`order-toast-icon ${orderAlertToast.status === "Preparing"
                   ? "cooking"
                   : orderAlertToast.status === "Ready for pickup"
                     ? "ready"
                     : orderAlertToast.status === "Completed"
                       ? "completed"
                       : "placed"
-              }`}
+                }`}
             >
               {orderAlertToast.status === "Preparing" ? (
                 <Icon name="chef" size={20} />
@@ -3968,18 +3945,18 @@ export default function App() {
               <span>{activeCampus.name}</span>
               <span className="breadcrumb-slash">/</span>
               <strong>
-              {currentUser.role === "admin"
-                ? "Admin dashboard"
-                : currentUser.role === "staff"
-                  ? "Kitchen operations"
-                  : currentUser.role === "stall_manager"
-                    ? branchNavTab === "overview"
-                      ? "Branch Operations • 2 Branches Overview"
-                      : `Branch Operations • ${stalls.find((s) => (branchNavTab === "stall_1" ? s.id === 1 : s.id === 2))?.name || "Branch"}`
-                    : "Student canteen"}
-            </strong>
+                {currentUser.role === "admin"
+                  ? "Admin dashboard"
+                  : currentUser.role === "staff"
+                    ? "Kitchen operations"
+                    : currentUser.role === "stall_manager"
+                      ? branchNavTab === "overview"
+                        ? "Branch Operations • 2 Branches Overview"
+                        : `Branch Operations • ${stalls.find((s) => (branchNavTab === "stall_1" ? s.id === 1 : s.id === 2))?.name || "Branch"}`
+                      : "Student canteen"}
+              </strong>
+            </div>
           </div>
-        </div>
 
           <div className="topbar-actions">
             {/* Live Open Status Pill */}
@@ -4066,7 +4043,7 @@ export default function App() {
                                 "smartbite_notifications",
                                 JSON.stringify(updated),
                               )
-                            } catch {}
+                            } catch { }
                             return updated
                           })
                         }}
@@ -4130,9 +4107,8 @@ export default function App() {
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          className={`notification-item-card ${
-                            notif.unread ? "unread" : ""
-                          }`}
+                          className={`notification-item-card ${notif.unread ? "unread" : ""
+                            }`}
                           onClick={() => {
                             setNotifications((prev) => {
                               const updated = prev.map((n) =>
@@ -4143,7 +4119,7 @@ export default function App() {
                                   "smartbite_notifications",
                                   JSON.stringify(updated),
                                 )
-                              } catch {}
+                              } catch { }
                               return updated
                             })
                             if (notif.type === "order") {
@@ -4202,15 +4178,14 @@ export default function App() {
                             </div>
                             {notif.status && (
                               <span
-                                className={`status-pill ${
-                                  notif.status === "Ready for pickup"
+                                className={`status-pill ${notif.status === "Ready for pickup"
                                     ? "ready"
                                     : notif.status === "Preparing"
                                       ? "preparing"
                                       : notif.status === "Completed"
                                         ? "completed"
                                         : "pending"
-                                }`}
+                                  }`}
                                 style={{
                                   fontSize: "9px",
                                   padding: "1px 6px",
@@ -4535,15 +4510,14 @@ export default function App() {
                                   </td>
                                   <td>
                                     <span
-                                      className={`status-pill ${
-                                        ord.order_status === "Ready for pickup"
+                                      className={`status-pill ${ord.order_status === "Ready for pickup"
                                           ? "ready"
                                           : ord.order_status === "Preparing"
                                             ? "preparing"
                                             : ord.order_status === "Completed"
                                               ? "completed"
                                               : "pending"
-                                      }`}
+                                        }`}
                                     >
                                       {ord.order_status}
                                     </span>
@@ -4779,15 +4753,14 @@ export default function App() {
                             <td>{ord.payment_method}</td>
                             <td>
                               <span
-                                className={`status-pill ${
-                                  ord.order_status === "Ready for pickup"
+                                className={`status-pill ${ord.order_status === "Ready for pickup"
                                     ? "ready"
                                     : ord.order_status === "Preparing"
                                       ? "preparing"
                                       : ord.order_status === "Completed"
                                         ? "completed"
                                         : "pending"
-                                }`}
+                                  }`}
                               >
                                 {ord.order_status}
                               </span>
@@ -4937,9 +4910,8 @@ export default function App() {
                             <td>
                               <button
                                 type="button"
-                                className={`status-pill ${
-                                  item.is_available ? "ready" : "cancelled"
-                                }`}
+                                className={`status-pill ${item.is_available ? "ready" : "cancelled"
+                                  }`}
                                 style={{
                                   border: "none",
                                   cursor: "pointer",
@@ -5131,7 +5103,7 @@ export default function App() {
                         onClick={() => {
                           setAdminCreateUserModalOpen(true)
                           setNewPassword("")
-      setShowNewPassword(false)
+                          setShowNewPassword(false)
                           setShowNewPassword(false)
                           setAdminUserModalError("")
                           setAdminUserModalSuccess("")
@@ -5278,7 +5250,7 @@ export default function App() {
                               </td>
                               <td>
                                 {user.role === "staff" ||
-                                user.role === "stall_manager" ? (
+                                  user.role === "stall_manager" ? (
                                   <select
                                     value={user.stall_id || 1}
                                     onChange={async (e) => {
@@ -5316,11 +5288,10 @@ export default function App() {
                               <td>₱{user.balance}.00</td>
                               <td>
                                 <span
-                                  className={`status-pill ${
-                                    user.is_active !== false
+                                  className={`status-pill ${user.is_active !== false
                                       ? "ready"
                                       : "cancelled"
-                                  }`}
+                                    }`}
                                 >
                                   {user.is_active !== false
                                     ? "Active"
@@ -5394,7 +5365,7 @@ export default function App() {
                                       if (
                                         (ADMIN_CREDENTIALS.userId &&
                                           user.student_id ===
-                                            ADMIN_CREDENTIALS.userId) ||
+                                          ADMIN_CREDENTIALS.userId) ||
                                         user.id === currentUser.id
                                       ) {
                                         alert(
@@ -5520,9 +5491,8 @@ export default function App() {
                 style={{ display: "flex", gap: "8px", marginBottom: "20px" }}
               >
                 <button
-                  className={`filter-pill-btn ${
-                    staffNavTab === "kds" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${staffNavTab === "kds" ? "active" : ""
+                    }`}
                   onClick={() => setStaffNavTab("kds")}
                 >
                   Live Queue (
@@ -5536,9 +5506,8 @@ export default function App() {
                   active)
                 </button>
                 <button
-                  className={`filter-pill-btn ${
-                    staffNavTab === "orders" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${staffNavTab === "orders" ? "active" : ""
+                    }`}
                   onClick={() => setStaffNavTab("orders")}
                 >
                   Orders (
@@ -5552,17 +5521,15 @@ export default function App() {
                   )
                 </button>
                 <button
-                  className={`filter-pill-btn ${
-                    staffNavTab === "menu_crud" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${staffNavTab === "menu_crud" ? "active" : ""
+                    }`}
                   onClick={() => setStaffNavTab("menu_crud")}
                 >
                   Menu Items ({items.length})
                 </button>
                 <button
-                  className={`filter-pill-btn ${
-                    staffNavTab === "inventory_crud" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${staffNavTab === "inventory_crud" ? "active" : ""
+                    }`}
                   onClick={() => setStaffNavTab("inventory_crud")}
                 >
                   Ingredient Stock ({inventoryList.length})
@@ -5617,7 +5584,7 @@ export default function App() {
                               fontSize: "12px",
                             }}
                           >
-                            
+
                           </p>
                         </div>
 
@@ -5697,9 +5664,8 @@ export default function App() {
 
                           <button
                             type="button"
-                            className={`filter-pill-btn ${
-                              staffKdsFilter === "all" ? "active" : ""
-                            }`}
+                            className={`filter-pill-btn ${staffKdsFilter === "all" ? "active" : ""
+                              }`}
                             style={{ fontSize: "12px", padding: "6px 14px" }}
                             onClick={() => setStaffKdsFilter("all")}
                           >
@@ -5707,9 +5673,8 @@ export default function App() {
                           </button>
                           <button
                             type="button"
-                            className={`filter-pill-btn ${
-                              staffKdsFilter === "upcoming" ? "active" : ""
-                            }`}
+                            className={`filter-pill-btn ${staffKdsFilter === "upcoming" ? "active" : ""
+                              }`}
                             style={{
                               fontSize: "12px",
                               padding: "6px 14px",
@@ -5724,13 +5689,12 @@ export default function App() {
                             }}
                             onClick={() => setStaffKdsFilter("upcoming")}
                           >
-                             Upcoming ({upcomingOrders.length})
+                            Upcoming ({upcomingOrders.length})
                           </button>
                           <button
                             type="button"
-                            className={`filter-pill-btn ${
-                              staffKdsFilter === "completed" ? "active" : ""
-                            }`}
+                            className={`filter-pill-btn ${staffKdsFilter === "completed" ? "active" : ""
+                              }`}
                             style={{
                               fontSize: "12px",
                               padding: "6px 14px",
@@ -5847,7 +5811,7 @@ export default function App() {
                                       >
                                         <span>{ord.payment_method}</span>
                                         {ord.payment_status === "paid" ||
-                                        ord.order_status === "Completed" ? (
+                                          ord.order_status === "Completed" ? (
                                           <span
                                             style={{
                                               color: "#16a34a",
@@ -5885,15 +5849,14 @@ export default function App() {
                                     </td>
                                     <td>
                                       <span
-                                        className={`status-pill ${
-                                          ord.order_status === "Ready for pickup"
+                                        className={`status-pill ${ord.order_status === "Ready for pickup"
                                             ? "ready"
                                             : ord.order_status === "Preparing"
                                               ? "preparing"
                                               : ord.order_status === "Completed"
                                                 ? "completed"
                                                 : "pending"
-                                        }`}
+                                          }`}
                                       >
                                         {ord.order_status}
                                       </span>
@@ -5964,201 +5927,584 @@ export default function App() {
                           {/* SECTION 1: UPCOMING & IN-PROGRESS ORDERS */}
                           {(staffKdsFilter === "all" ||
                             staffKdsFilter === "upcoming") && (
-                            <div>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  marginBottom: "14px",
-                                  borderBottom: "2px solid #E2E8F0",
-                                  paddingBottom: "8px",
-                                  flexWrap: "wrap",
-                                  gap: "8px",
-                                }}
-                              >
+                              <div>
                                 <div
                                   style={{
                                     display: "flex",
+                                    justifyContent: "space-between",
                                     alignItems: "center",
+                                    marginBottom: "14px",
+                                    borderBottom: "2px solid #E2E8F0",
+                                    paddingBottom: "8px",
+                                    flexWrap: "wrap",
                                     gap: "8px",
                                   }}
                                 >
-                                  <span
+                                  <div
                                     style={{
-                                      display: "inline-block",
-                                      width: "10px",
-                                      height: "10px",
-                                      borderRadius: "50%",
-                                      background: "#f59e0b",
-                                      boxShadow:
-                                        "0 0 0 3px rgba(245, 158, 11, 0.2)",
-                                    }}
-                                  />
-                                  <h4
-                                    style={{
-                                      margin: 0,
-                                      fontSize: "16px",
-                                      color: "var(--ink)",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "8px",
                                     }}
                                   >
-                                    Upcoming &amp; In-Progress Orders
-                                  </h4>
-                                  <span
-                                    className="count-badge ready"
+                                    <span
+                                      style={{
+                                        display: "inline-block",
+                                        width: "10px",
+                                        height: "10px",
+                                        borderRadius: "50%",
+                                        background: "#f59e0b",
+                                        boxShadow:
+                                          "0 0 0 3px rgba(245, 158, 11, 0.2)",
+                                      }}
+                                    />
+                                    <h4
+                                      style={{
+                                        margin: 0,
+                                        fontSize: "16px",
+                                        color: "var(--ink)",
+                                      }}
+                                    >
+                                      Upcoming &amp; In-Progress Orders
+                                    </h4>
+                                    <span
+                                      className="count-badge ready"
+                                      style={{
+                                        fontSize: "11px",
+                                        padding: "2px 8px",
+                                      }}
+                                    >
+                                      {upcomingOrders.length} ticket
+                                      {upcomingOrders.length !== 1 ? "s" : ""}
+                                    </span>
+                                  </div>
+                                  <small
                                     style={{
-                                      fontSize: "11px",
-                                      padding: "2px 8px",
-                                    }}
-                                  >
-                                    {upcomingOrders.length} ticket
-                                    {upcomingOrders.length !== 1 ? "s" : ""}
-                                  </span>
-                                </div>
-                                <small
-                                  style={{
-                                    color: "var(--muted)",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  Needs kitchen cooking &amp; counter pickup
-                                </small>
-                              </div>
-
-                              {upcomingOrders.length === 0 ? (
-                                <div
-                                  style={{
-                                    textAlign: "center",
-                                    padding: "36px 16px",
-                                    background: "#F8FAFC",
-                                    borderRadius: "10px",
-                                    border: "1px dashed var(--line)",
-                                    color: "var(--muted)",
-                                  }}
-                                >
-                                  <Icon name="check" size={28} />
-                                  <strong
-                                    style={{
-                                      display: "block",
-                                      fontSize: "14px",
-                                      marginTop: "8px",
-                                      color: "var(--ink)",
-                                    }}
-                                  >
-                                    All caught up!
-                                  </strong>
-                                  <p
-                                    style={{
-                                      margin: "4px 0 0",
+                                      color: "var(--muted)",
                                       fontSize: "12px",
                                     }}
                                   >
-                                    No upcoming orders waiting for preparation
-                                    right now.
-                                  </p>
+                                    Needs kitchen cooking &amp; counter pickup
+                                  </small>
                                 </div>
-                              ) : (
-                                <div className="kds-cards-grid">
-                                  {upcomingOrders.map((ord) => (
-                                    <div
-                                      className="kds-ticket-card"
-                                      key={ord.id}
+
+                                {upcomingOrders.length === 0 ? (
+                                  <div
+                                    style={{
+                                      textAlign: "center",
+                                      padding: "36px 16px",
+                                      background: "#F8FAFC",
+                                      borderRadius: "10px",
+                                      border: "1px dashed var(--line)",
+                                      color: "var(--muted)",
+                                    }}
+                                  >
+                                    <Icon name="check" size={28} />
+                                    <strong
                                       style={{
-                                        borderTop:
-                                          ord.order_status ===
-                                          "Ready for pickup"
-                                            ? "4px solid #16a34a"
-                                            : ord.order_status === "Preparing"
-                                              ? "4px solid #f59e0b"
-                                              : "4px solid #3b82f6",
+                                        display: "block",
+                                        fontSize: "14px",
+                                        marginTop: "8px",
+                                        color: "var(--ink)",
                                       }}
                                     >
-                                      <div>
-                                        <div className="kds-card-head">
-                                          <div>
+                                      All caught up!
+                                    </strong>
+                                    <p
+                                      style={{
+                                        margin: "4px 0 0",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      No upcoming orders waiting for preparation
+                                      right now.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="kds-cards-grid">
+                                    {upcomingOrders.map((ord) => (
+                                      <div
+                                        className="kds-ticket-card"
+                                        key={ord.id}
+                                        style={{
+                                          borderTop:
+                                            ord.order_status ===
+                                              "Ready for pickup"
+                                              ? "4px solid #16a34a"
+                                              : ord.order_status === "Preparing"
+                                                ? "4px solid #f59e0b"
+                                                : "4px solid #3b82f6",
+                                        }}
+                                      >
+                                        <div>
+                                          <div className="kds-card-head">
+                                            <div>
+                                              <span
+                                                style={{
+                                                  fontSize: "11px",
+                                                  fontWeight: 800,
+                                                  color: "var(--primary)",
+                                                }}
+                                              >
+                                                TICKET #{ord.id}
+                                              </span>
+                                              <strong
+                                                style={{
+                                                  display: "block",
+                                                  fontSize: "15px",
+                                                  marginTop: "2px",
+                                                }}
+                                              >
+                                                {ord.student_name}
+                                              </strong>
+                                              <small
+                                                style={{ color: "var(--muted)" }}
+                                              >
+                                                ID: {ord.student_number}
+                                              </small>
+                                            </div>
+                                            <span
+                                              className={`status-pill ${ord.order_status ===
+                                                  "Ready for pickup"
+                                                  ? "ready"
+                                                  : ord.order_status ===
+                                                    "Preparing"
+                                                    ? "preparing"
+                                                    : "pending"
+                                                }`}
+                                            >
+                                              {ord.order_status}
+                                            </span>
+                                          </div>
+                                          <ul className="kds-items-list">
+                                            {ord.order_items?.map((oi, i) => (
+                                              <li
+                                                className="kds-item-row"
+                                                key={i}
+                                              >
+                                                <span>
+                                                  {oi.item_name} &times;{" "}
+                                                  {oi.quantity}
+                                                </span>
+                                                <strong>
+                                                  ₱{oi.item_subtotal}.00
+                                                </strong>
+                                              </li>
+                                            )) || (
+                                                <li className="kds-item-row">
+                                                  <span>Meal Package</span>
+                                                  <strong>
+                                                    ₱{ord.total_amount}.00
+                                                  </strong>
+                                                </li>
+                                              )}
+                                          </ul>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              alignItems: "center",
+                                              fontSize: "12px",
+                                              color: "var(--muted)",
+                                              marginBottom: "12px",
+                                              flexWrap: "wrap",
+                                              gap: "6px",
+                                            }}
+                                          >
+                                            <span>
+                                              Payment:{" "}
+                                              <strong
+                                                style={{ color: "var(--ink)" }}
+                                              >
+                                                {ord.payment_method}
+                                              </strong>
+                                            </span>
+                                            {ord.payment_status === "paid" ||
+                                              ord.order_status === "Completed" ? (
+                                              <span
+                                                style={{
+                                                  color: "#16a34a",
+                                                  fontWeight: 700,
+                                                }}
+                                              >
+                                                Paid ✓
+                                              </span>
+                                            ) : (
+                                              <div
+                                                style={{
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: "6px",
+                                                }}
+                                              >
+                                                <span
+                                                  style={{
+                                                    color: "#d97706",
+                                                    fontWeight: 700,
+                                                  }}
+                                                >
+                                                  Pay at Counter
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  style={{
+                                                    background: "#DCFCE7",
+                                                    color: "#15803D",
+                                                    border: "1px solid #86EFAC",
+                                                    borderRadius: "4px",
+                                                    padding: "2px 8px",
+                                                    fontSize: "11px",
+                                                    fontWeight: 600,
+                                                    cursor: "pointer",
+                                                  }}
+                                                  onClick={async () => {
+                                                    await canteenApi.orders.updatePaymentStatus(
+                                                      ord.id,
+                                                      "paid",
+                                                    )
+                                                    refreshAllData()
+                                                  }}
+                                                >
+                                                  💵 Mark Paid
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "space-between",
+                                              marginBottom: "8px",
+                                              padding: "6px 8px",
+                                              background: "#F8FAFC",
+                                              borderRadius: "6px",
+                                              border: "1px solid #E2E8F0",
+                                            }}
+                                          >
                                             <span
                                               style={{
                                                 fontSize: "11px",
-                                                fontWeight: 800,
-                                                color: "var(--primary)",
+                                                fontWeight: 700,
+                                                color: "var(--muted)",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.5px",
                                               }}
                                             >
-                                              TICKET #{ord.id}
+                                              Action:
                                             </span>
-                                            <strong
+                                            <select
+                                              value={ord.order_status}
+                                              onChange={async (e) => {
+                                                const newStatus = e.target.value
+                                                await canteenApi.orders.updateStatus(
+                                                  ord.id,
+                                                  newStatus as any,
+                                                )
+                                                if (newStatus === "Completed") {
+                                                  try {
+                                                    await canteenApi.orders.updatePaymentStatus(
+                                                      ord.id,
+                                                      "paid",
+                                                    )
+                                                  } catch (err) {
+                                                    console.warn(err)
+                                                  }
+                                                }
+                                                refreshAllData()
+                                              }}
                                               style={{
-                                                display: "block",
-                                                fontSize: "15px",
-                                                marginTop: "2px",
+                                                border: "1px solid var(--line)",
+                                                borderRadius: "5px",
+                                                padding: "3px 6px",
+                                                fontSize: "11px",
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                                background: "#fff",
+                                                color: "var(--ink)",
                                               }}
                                             >
-                                              {ord.student_name}
-                                            </strong>
-                                            <small
-                                              style={{ color: "var(--muted)" }}
-                                            >
-                                              ID: {ord.student_number}
-                                            </small>
+                                              <option value="Order placed">
+                                                Order placed
+                                              </option>
+                                              <option value="Preparing">
+                                                Preparing
+                                              </option>
+                                              <option value="Ready for pickup">
+                                                Ready for pickup
+                                              </option>
+                                              <option value="Completed">
+                                                Completed
+                                              </option>
+                                              <option value="Cancelled">
+                                                Cancelled
+                                              </option>
+                                            </select>
                                           </div>
-                                          <span
-                                            className={`status-pill ${
-                                              ord.order_status ===
-                                              "Ready for pickup"
-                                                ? "ready"
-                                                : ord.order_status ===
-                                                    "Preparing"
-                                                  ? "preparing"
-                                                  : "pending"
-                                            }`}
-                                          >
-                                            {ord.order_status}
-                                          </span>
-                                        </div>
-                                        <ul className="kds-items-list">
-                                          {ord.order_items?.map((oi, i) => (
-                                            <li
-                                              className="kds-item-row"
-                                              key={i}
+                                          {ord.order_status ===
+                                            "Order placed" && (
+                                              <button
+                                                type="button"
+                                                className="kds-btn-action"
+                                                style={{
+                                                  background: "var(--accent-amber)",
+                                                  cursor: "pointer",
+                                                }}
+                                                onClick={async () => {
+                                                  await canteenApi.orders.updateStatus(
+                                                    ord.id,
+                                                    "Preparing",
+                                                  )
+                                                  refreshAllData()
+                                                }}
+                                              >
+                                                ▶ Start Cooking
+                                              </button>
+                                            )}
+                                          {ord.order_status === "Preparing" && (
+                                            <button
+                                              type="button"
+                                              className="kds-btn-action"
+                                              style={{
+                                                background: "var(--primary)",
+                                                cursor: "pointer",
+                                              }}
+                                              onClick={async () => {
+                                                await canteenApi.orders.updateStatus(
+                                                  ord.id,
+                                                  "Ready for pickup",
+                                                )
+                                                refreshAllData()
+                                              }}
                                             >
-                                              <span>
-                                                {oi.item_name} &times;{" "}
-                                                {oi.quantity}
-                                              </span>
-                                              <strong>
-                                                ₱{oi.item_subtotal}.00
-                                              </strong>
-                                            </li>
-                                          )) || (
-                                            <li className="kds-item-row">
-                                              <span>Meal Package</span>
-                                              <strong>
-                                                ₱{ord.total_amount}.00
-                                              </strong>
-                                            </li>
+                                              ✓ Mark Ready for Pickup
+                                            </button>
                                           )}
-                                        </ul>
-                                        <div
-                                          style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                            fontSize: "12px",
-                                            color: "var(--muted)",
-                                            marginBottom: "12px",
-                                            flexWrap: "wrap",
-                                            gap: "6px",
-                                          }}
-                                        >
-                                          <span>
-                                            Payment:{" "}
-                                            <strong
-                                              style={{ color: "var(--ink)" }}
-                                            >
-                                              {ord.payment_method}
-                                            </strong>
-                                          </span>
-                                          {ord.payment_status === "paid" ||
-                                          ord.order_status === "Completed" ? (
+                                          {ord.order_status ===
+                                            "Ready for pickup" && (
+                                              <button
+                                                type="button"
+                                                className="kds-btn-action"
+                                                style={{
+                                                  background: "#16a34a",
+                                                  color: "#fff",
+                                                  cursor: "pointer",
+                                                }}
+                                                onClick={async () => {
+                                                  await canteenApi.orders.updateStatus(
+                                                    ord.id,
+                                                    "Completed",
+                                                  )
+                                                  await canteenApi.orders.updatePaymentStatus(
+                                                    ord.id,
+                                                    "paid",
+                                                  )
+                                                  refreshAllData()
+                                                }}
+                                              >
+                                                ✓ Complete Ticket
+                                              </button>
+                                            )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                          {/* SECTION 2: COMPLETED ORDERS */}
+                          {(staffKdsFilter === "all" ||
+                            staffKdsFilter === "completed") && (
+                              <div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    marginBottom: "14px",
+                                    borderBottom: "2px solid #E2E8F0",
+                                    paddingBottom: "8px",
+                                    flexWrap: "wrap",
+                                    gap: "8px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "8px",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        display: "inline-block",
+                                        width: "10px",
+                                        height: "10px",
+                                        borderRadius: "50%",
+                                        background: "#16a34a",
+                                        boxShadow:
+                                          "0 0 0 3px rgba(22, 163, 74, 0.2)",
+                                      }}
+                                    />
+                                    <h4
+                                      style={{
+                                        margin: 0,
+                                        fontSize: "16px",
+                                        color: "var(--ink)",
+                                      }}
+                                    >
+                                      Completed Orders
+                                    </h4>
+                                    <span
+                                      className="count-badge"
+                                      style={{
+                                        fontSize: "11px",
+                                        padding: "2px 8px",
+                                        background: "#F1F5F9",
+                                        color: "var(--muted)",
+                                      }}
+                                    >
+                                      {completedOrders.length} fulfilled
+                                    </span>
+                                  </div>
+                                  <small
+                                    style={{
+                                      color: "var(--muted)",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    Past orders picked up and finalized
+                                  </small>
+                                </div>
+
+                                {completedOrders.length === 0 ? (
+                                  <div
+                                    style={{
+                                      textAlign: "center",
+                                      padding: "36px 16px",
+                                      background: "#F8FAFC",
+                                      borderRadius: "10px",
+                                      border: "1px dashed var(--line)",
+                                      color: "var(--muted)",
+                                    }}
+                                  >
+                                    <Icon name="receipt" size={28} />
+                                    <strong
+                                      style={{
+                                        display: "block",
+                                        fontSize: "14px",
+                                        marginTop: "8px",
+                                        color: "var(--ink)",
+                                      }}
+                                    >
+                                      No completed tickets yet
+                                    </strong>
+                                    <p
+                                      style={{
+                                        margin: "4px 0 0",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      Tickets will appear here after staff clicks
+                                      &quot;Complete Ticket&quot;.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="kds-cards-grid">
+                                    {completedOrders.map((ord) => (
+                                      <div
+                                        className="kds-ticket-card"
+                                        key={ord.id}
+                                        style={{
+                                          borderTop: "4px solid #94a3b8",
+                                          background: "#FAFBF9",
+                                          opacity: 0.92,
+                                        }}
+                                      >
+                                        <div>
+                                          <div className="kds-card-head">
+                                            <div>
+                                              <span
+                                                style={{
+                                                  fontSize: "11px",
+                                                  fontWeight: 800,
+                                                  color: "var(--muted)",
+                                                }}
+                                              >
+                                                TICKET #{ord.id}
+                                              </span>
+                                              <strong
+                                                style={{
+                                                  display: "block",
+                                                  fontSize: "15px",
+                                                  marginTop: "2px",
+                                                }}
+                                              >
+                                                {ord.student_name}
+                                              </strong>
+                                              <small
+                                                style={{ color: "var(--muted)" }}
+                                              >
+                                                ID: {ord.student_number}
+                                              </small>
+                                            </div>
+                                            <span className="status-pill completed">
+                                              Completed
+                                            </span>
+                                          </div>
+                                          <ul className="kds-items-list">
+                                            {ord.order_items?.map((oi, i) => (
+                                              <li
+                                                className="kds-item-row"
+                                                key={i}
+                                              >
+                                                <span
+                                                  style={{
+                                                    color: "var(--muted)",
+                                                  }}
+                                                >
+                                                  {oi.item_name} &times;{" "}
+                                                  {oi.quantity}
+                                                </span>
+                                                <strong>
+                                                  ₱{oi.item_subtotal}.00
+                                                </strong>
+                                              </li>
+                                            )) || (
+                                                <li className="kds-item-row">
+                                                  <span
+                                                    style={{
+                                                      color: "var(--muted)",
+                                                    }}
+                                                  >
+                                                    Meal Package
+                                                  </span>
+                                                  <strong>
+                                                    ₱{ord.total_amount}.00
+                                                  </strong>
+                                                </li>
+                                              )}
+                                          </ul>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              fontSize: "12px",
+                                              color: "var(--muted)",
+                                              marginBottom: "10px",
+                                            }}
+                                          >
+                                            <span>
+                                              Payment:{" "}
+                                              <strong
+                                                style={{ color: "var(--ink)" }}
+                                              >
+                                                {ord.payment_method}
+                                              </strong>
+                                            </span>
                                             <span
                                               style={{
                                                 color: "#16a34a",
@@ -6167,146 +6513,106 @@ export default function App() {
                                             >
                                               Paid ✓
                                             </span>
-                                          ) : (
-                                            <div
-                                              style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                              }}
-                                            >
-                                              <span
-                                                style={{
-                                                  color: "#d97706",
-                                                  fontWeight: 700,
-                                                }}
-                                              >
-                                                Pay at Counter
-                                              </span>
-                                              <button
-                                                type="button"
-                                                style={{
-                                                  background: "#DCFCE7",
-                                                  color: "#15803D",
-                                                  border: "1px solid #86EFAC",
-                                                  borderRadius: "4px",
-                                                  padding: "2px 8px",
-                                                  fontSize: "11px",
-                                                  fontWeight: 600,
-                                                  cursor: "pointer",
-                                                }}
-                                                onClick={async () => {
-                                                  await canteenApi.orders.updatePaymentStatus(
-                                                    ord.id,
-                                                    "paid",
-                                                  )
-                                                  refreshAllData()
-                                                }}
-                                              >
-                                                💵 Mark Paid
-                                              </button>
-                                            </div>
-                                          )}
+                                          </div>
                                         </div>
-                                      </div>
-                                      <div>
                                         <div
                                           style={{
                                             display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between",
-                                            marginBottom: "8px",
-                                            padding: "6px 8px",
-                                            background: "#F8FAFC",
-                                            borderRadius: "6px",
-                                            border: "1px solid #E2E8F0",
+                                            flexDirection: "column",
+                                            gap: "6px",
                                           }}
                                         >
-                                          <span
+                                          <div
                                             style={{
-                                              fontSize: "11px",
-                                              fontWeight: 700,
-                                              color: "var(--muted)",
-                                              textTransform: "uppercase",
-                                              letterSpacing: "0.5px",
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "space-between",
+                                              marginBottom: "2px",
+                                              padding: "6px 8px",
+                                              background: "#F8FAFC",
+                                              borderRadius: "6px",
+                                              border: "1px solid #E2E8F0",
                                             }}
                                           >
-                                            Action:
-                                          </span>
-                                          <select
-                                            value={ord.order_status}
-                                            onChange={async (e) => {
-                                              const newStatus = e.target.value
-                                              await canteenApi.orders.updateStatus(
-                                                ord.id,
-                                                newStatus as any,
-                                              )
-                                              if (newStatus === "Completed") {
-                                                try {
-                                                  await canteenApi.orders.updatePaymentStatus(
-                                                    ord.id,
-                                                    "paid",
-                                                  )
-                                                } catch (err) {
-                                                  console.warn(err)
+                                            <span
+                                              style={{
+                                                fontSize: "11px",
+                                                fontWeight: 700,
+                                                color: "var(--muted)",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.5px",
+                                              }}
+                                            >
+                                              Action:
+                                            </span>
+                                            <select
+                                              value={ord.order_status}
+                                              onChange={async (e) => {
+                                                const newStatus = e.target.value
+                                                await canteenApi.orders.updateStatus(
+                                                  ord.id,
+                                                  newStatus as any,
+                                                )
+                                                if (newStatus === "Completed") {
+                                                  try {
+                                                    await canteenApi.orders.updatePaymentStatus(
+                                                      ord.id,
+                                                      "paid",
+                                                    )
+                                                  } catch (err) {
+                                                    console.warn(err)
+                                                  }
                                                 }
-                                              }
-                                              refreshAllData()
-                                            }}
+                                                refreshAllData()
+                                              }}
+                                              style={{
+                                                border: "1px solid var(--line)",
+                                                borderRadius: "5px",
+                                                padding: "3px 6px",
+                                                fontSize: "11px",
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                                background: "#fff",
+                                                color: "var(--ink)",
+                                              }}
+                                            >
+                                              <option value="Order placed">
+                                                Order placed
+                                              </option>
+                                              <option value="Preparing">
+                                                Preparing
+                                              </option>
+                                              <option value="Ready for pickup">
+                                                Ready for pickup
+                                              </option>
+                                              <option value="Completed">
+                                                Completed
+                                              </option>
+                                              <option value="Cancelled">
+                                                Cancelled
+                                              </option>
+                                            </select>
+                                          </div>
+                                          <div
                                             style={{
-                                              border: "1px solid var(--line)",
-                                              borderRadius: "5px",
-                                              padding: "3px 6px",
+                                              textAlign: "center",
+                                              fontSize: "12px",
+                                              color: "#16a34a",
+                                              fontWeight: 700,
+                                              padding: "8px",
+                                              background: "#F0FDF4",
+                                              borderRadius: "6px",
+                                            }}
+                                          >
+                                            ✓ Completed &amp; Claimed
+                                          </div>
+                                          <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            style={{
                                               fontSize: "11px",
-                                              fontWeight: 600,
-                                              cursor: "pointer",
-                                              background: "#fff",
-                                              color: "var(--ink)",
-                                            }}
-                                          >
-                                            <option value="Order placed">
-                                              Order placed
-                                            </option>
-                                            <option value="Preparing">
-                                              Preparing
-                                            </option>
-                                            <option value="Ready for pickup">
-                                              Ready for pickup
-                                            </option>
-                                            <option value="Completed">
-                                              Completed
-                                            </option>
-                                            <option value="Cancelled">
-                                              Cancelled
-                                            </option>
-                                          </select>
-                                        </div>
-                                        {ord.order_status ===
-                                          "Order placed" && (
-                                          <button
-                                            type="button"
-                                            className="kds-btn-action"
-                                            style={{
-                                              background: "var(--accent-amber)",
-                                              cursor: "pointer",
-                                            }}
-                                            onClick={async () => {
-                                              await canteenApi.orders.updateStatus(
-                                                ord.id,
-                                                "Preparing",
-                                              )
-                                              refreshAllData()
-                                            }}
-                                          >
-                                            ▶ Start Cooking
-                                          </button>
-                                        )}
-                                        {ord.order_status === "Preparing" && (
-                                          <button
-                                            type="button"
-                                            className="kds-btn-action"
-                                            style={{
-                                              background: "var(--primary)",
+                                              padding: "4px 8px",
+                                              color: "var(--muted)",
                                               cursor: "pointer",
                                             }}
                                             onClick={async () => {
@@ -6317,359 +6623,15 @@ export default function App() {
                                               refreshAllData()
                                             }}
                                           >
-                                            ✓ Mark Ready for Pickup
+                                            ↺ Move Back to Active Queue
                                           </button>
-                                        )}
-                                        {ord.order_status ===
-                                          "Ready for pickup" && (
-                                          <button
-                                            type="button"
-                                            className="kds-btn-action"
-                                            style={{
-                                              background: "#16a34a",
-                                              color: "#fff",
-                                              cursor: "pointer",
-                                            }}
-                                            onClick={async () => {
-                                              await canteenApi.orders.updateStatus(
-                                                ord.id,
-                                                "Completed",
-                                              )
-                                              await canteenApi.orders.updatePaymentStatus(
-                                                ord.id,
-                                                "paid",
-                                              )
-                                              refreshAllData()
-                                            }}
-                                          >
-                                            ✓ Complete Ticket
-                                          </button>
-                                        )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* SECTION 2: COMPLETED ORDERS */}
-                          {(staffKdsFilter === "all" ||
-                            staffKdsFilter === "completed") && (
-                            <div>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  marginBottom: "14px",
-                                  borderBottom: "2px solid #E2E8F0",
-                                  paddingBottom: "8px",
-                                  flexWrap: "wrap",
-                                  gap: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      display: "inline-block",
-                                      width: "10px",
-                                      height: "10px",
-                                      borderRadius: "50%",
-                                      background: "#16a34a",
-                                      boxShadow:
-                                        "0 0 0 3px rgba(22, 163, 74, 0.2)",
-                                    }}
-                                  />
-                                  <h4
-                                    style={{
-                                      margin: 0,
-                                      fontSize: "16px",
-                                      color: "var(--ink)",
-                                    }}
-                                  >
-                                    Completed Orders
-                                  </h4>
-                                  <span
-                                    className="count-badge"
-                                    style={{
-                                      fontSize: "11px",
-                                      padding: "2px 8px",
-                                      background: "#F1F5F9",
-                                      color: "var(--muted)",
-                                    }}
-                                  >
-                                    {completedOrders.length} fulfilled
-                                  </span>
-                                </div>
-                                <small
-                                  style={{
-                                    color: "var(--muted)",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  Past orders picked up and finalized
-                                </small>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-
-                              {completedOrders.length === 0 ? (
-                                <div
-                                  style={{
-                                    textAlign: "center",
-                                    padding: "36px 16px",
-                                    background: "#F8FAFC",
-                                    borderRadius: "10px",
-                                    border: "1px dashed var(--line)",
-                                    color: "var(--muted)",
-                                  }}
-                                >
-                                  <Icon name="receipt" size={28} />
-                                  <strong
-                                    style={{
-                                      display: "block",
-                                      fontSize: "14px",
-                                      marginTop: "8px",
-                                      color: "var(--ink)",
-                                    }}
-                                  >
-                                    No completed tickets yet
-                                  </strong>
-                                  <p
-                                    style={{
-                                      margin: "4px 0 0",
-                                      fontSize: "12px",
-                                    }}
-                                  >
-                                    Tickets will appear here after staff clicks
-                                    &quot;Complete Ticket&quot;.
-                                  </p>
-                                </div>
-                              ) : (
-                                <div className="kds-cards-grid">
-                                  {completedOrders.map((ord) => (
-                                    <div
-                                      className="kds-ticket-card"
-                                      key={ord.id}
-                                      style={{
-                                        borderTop: "4px solid #94a3b8",
-                                        background: "#FAFBF9",
-                                        opacity: 0.92,
-                                      }}
-                                    >
-                                      <div>
-                                        <div className="kds-card-head">
-                                          <div>
-                                            <span
-                                              style={{
-                                                fontSize: "11px",
-                                                fontWeight: 800,
-                                                color: "var(--muted)",
-                                              }}
-                                            >
-                                              TICKET #{ord.id}
-                                            </span>
-                                            <strong
-                                              style={{
-                                                display: "block",
-                                                fontSize: "15px",
-                                                marginTop: "2px",
-                                              }}
-                                            >
-                                              {ord.student_name}
-                                            </strong>
-                                            <small
-                                              style={{ color: "var(--muted)" }}
-                                            >
-                                              ID: {ord.student_number}
-                                            </small>
-                                          </div>
-                                          <span className="status-pill completed">
-                                            Completed
-                                          </span>
-                                        </div>
-                                        <ul className="kds-items-list">
-                                          {ord.order_items?.map((oi, i) => (
-                                            <li
-                                              className="kds-item-row"
-                                              key={i}
-                                            >
-                                              <span
-                                                style={{
-                                                  color: "var(--muted)",
-                                                }}
-                                              >
-                                                {oi.item_name} &times;{" "}
-                                                {oi.quantity}
-                                              </span>
-                                              <strong>
-                                                ₱{oi.item_subtotal}.00
-                                              </strong>
-                                            </li>
-                                          )) || (
-                                            <li className="kds-item-row">
-                                              <span
-                                                style={{
-                                                  color: "var(--muted)",
-                                                }}
-                                              >
-                                                Meal Package
-                                              </span>
-                                              <strong>
-                                                ₱{ord.total_amount}.00
-                                              </strong>
-                                            </li>
-                                          )}
-                                        </ul>
-                                        <div
-                                          style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            fontSize: "12px",
-                                            color: "var(--muted)",
-                                            marginBottom: "10px",
-                                          }}
-                                        >
-                                          <span>
-                                            Payment:{" "}
-                                            <strong
-                                              style={{ color: "var(--ink)" }}
-                                            >
-                                              {ord.payment_method}
-                                            </strong>
-                                          </span>
-                                          <span
-                                            style={{
-                                              color: "#16a34a",
-                                              fontWeight: 700,
-                                            }}
-                                          >
-                                            Paid ✓
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          flexDirection: "column",
-                                          gap: "6px",
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between",
-                                            marginBottom: "2px",
-                                            padding: "6px 8px",
-                                            background: "#F8FAFC",
-                                            borderRadius: "6px",
-                                            border: "1px solid #E2E8F0",
-                                          }}
-                                        >
-                                          <span
-                                            style={{
-                                              fontSize: "11px",
-                                              fontWeight: 700,
-                                              color: "var(--muted)",
-                                              textTransform: "uppercase",
-                                              letterSpacing: "0.5px",
-                                            }}
-                                          >
-                                            Action:
-                                          </span>
-                                          <select
-                                            value={ord.order_status}
-                                            onChange={async (e) => {
-                                              const newStatus = e.target.value
-                                              await canteenApi.orders.updateStatus(
-                                                ord.id,
-                                                newStatus as any,
-                                              )
-                                              if (newStatus === "Completed") {
-                                                try {
-                                                  await canteenApi.orders.updatePaymentStatus(
-                                                    ord.id,
-                                                    "paid",
-                                                  )
-                                                } catch (err) {
-                                                  console.warn(err)
-                                                }
-                                              }
-                                              refreshAllData()
-                                            }}
-                                            style={{
-                                              border: "1px solid var(--line)",
-                                              borderRadius: "5px",
-                                              padding: "3px 6px",
-                                              fontSize: "11px",
-                                              fontWeight: 600,
-                                              cursor: "pointer",
-                                              background: "#fff",
-                                              color: "var(--ink)",
-                                            }}
-                                          >
-                                            <option value="Order placed">
-                                              Order placed
-                                            </option>
-                                            <option value="Preparing">
-                                              Preparing
-                                            </option>
-                                            <option value="Ready for pickup">
-                                              Ready for pickup
-                                            </option>
-                                            <option value="Completed">
-                                              Completed
-                                            </option>
-                                            <option value="Cancelled">
-                                              Cancelled
-                                            </option>
-                                          </select>
-                                        </div>
-                                        <div
-                                          style={{
-                                            textAlign: "center",
-                                            fontSize: "12px",
-                                            color: "#16a34a",
-                                            fontWeight: 700,
-                                            padding: "8px",
-                                            background: "#F0FDF4",
-                                            borderRadius: "6px",
-                                          }}
-                                        >
-                                          ✓ Completed &amp; Claimed
-                                        </div>
-                                        <button
-                                          type="button"
-                                          className="btn-secondary"
-                                          style={{
-                                            fontSize: "11px",
-                                            padding: "4px 8px",
-                                            color: "var(--muted)",
-                                            cursor: "pointer",
-                                          }}
-                                          onClick={async () => {
-                                            await canteenApi.orders.updateStatus(
-                                              ord.id,
-                                              "Ready for pickup",
-                                            )
-                                            refreshAllData()
-                                          }}
-                                        >
-                                          ↺ Move Back to Active Queue
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                            )}
                         </div>
                       )}
                     </div>
@@ -6769,14 +6731,13 @@ export default function App() {
                             st === "all"
                               ? stallOrders.length
                               : stallOrders.filter((o) => o.order_status === st)
-                                  .length
+                                .length
                           return (
                             <button
                               key={st}
                               type="button"
-                              className={`filter-pill-btn ${
-                                staffOrderTableFilter === st ? "active" : ""
-                              }`}
+                              className={`filter-pill-btn ${staffOrderTableFilter === st ? "active" : ""
+                                }`}
                               style={{
                                 fontSize: "12px",
                                 padding: "4px 12px",
@@ -6863,7 +6824,7 @@ export default function App() {
                                     >
                                       <span>{ord.payment_method}</span>
                                       {ord.payment_status === "paid" ||
-                                      ord.order_status === "Completed" ? (
+                                        ord.order_status === "Completed" ? (
                                         <span
                                           style={{
                                             color: "#16a34a",
@@ -6901,15 +6862,14 @@ export default function App() {
                                   </td>
                                   <td>
                                     <span
-                                      className={`status-pill ${
-                                        ord.order_status === "Ready for pickup"
+                                      className={`status-pill ${ord.order_status === "Ready for pickup"
                                           ? "ready"
                                           : ord.order_status === "Preparing"
                                             ? "preparing"
                                             : ord.order_status === "Completed"
                                               ? "completed"
                                               : "pending"
-                                      }`}
+                                        }`}
                                     >
                                       {ord.order_status}
                                     </span>
@@ -7051,9 +7011,8 @@ export default function App() {
                             <td>
                               <button
                                 type="button"
-                                className={`status-pill ${
-                                  item.is_available ? "ready" : "cancelled"
-                                }`}
+                                className={`status-pill ${item.is_available ? "ready" : "cancelled"
+                                  }`}
                                 style={{
                                   border: "none",
                                   cursor: "pointer",
@@ -7313,9 +7272,8 @@ export default function App() {
                               <p>{stall.description}</p>
                             </div>
                             <button
-                              className={`status-pill ${
-                                stall.is_open ? "ready" : "cancelled"
-                              }`}
+                              className={`status-pill ${stall.is_open ? "ready" : "cancelled"
+                                }`}
                               style={{ cursor: "pointer", border: 0 }}
                               onClick={async () => {
                                 await canteenApi.stalls.updateStall(stall.id, {
@@ -7474,7 +7432,7 @@ export default function App() {
                                   (u) =>
                                     u.role === "staff" &&
                                     Number(u.stall_id || 1) ===
-                                      Number(stall.id),
+                                    Number(stall.id),
                                 ).length
                               }{" "}
                               USERS):
@@ -7485,7 +7443,7 @@ export default function App() {
                                   (u) =>
                                     u.role === "staff" &&
                                     Number(u.stall_id || 1) ===
-                                      Number(stall.id),
+                                    Number(stall.id),
                                 )
                                 .map((u) => u.full_name)
                                 .join(", ") || "No staff assigned yet"}
@@ -7626,9 +7584,8 @@ export default function App() {
                         >
                           <button
                             type="button"
-                            className={`status-pill ${
-                              activeBranchStall.is_open ? "ready" : "cancelled"
-                            }`}
+                            className={`status-pill ${activeBranchStall.is_open ? "ready" : "cancelled"
+                              }`}
                             style={{
                               cursor: "pointer",
                               border: 0,
@@ -7837,9 +7794,8 @@ export default function App() {
                       >
                         <button
                           type="button"
-                          className={`filter-pill-btn ${
-                            branchSubTab === "orders" ? "active" : ""
-                          }`}
+                          className={`filter-pill-btn ${branchSubTab === "orders" ? "active" : ""
+                            }`}
                           onClick={() => setBranchSubTab("orders")}
                         >
                           <Icon name="receipt" size={13} />
@@ -7847,9 +7803,8 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          className={`filter-pill-btn ${
-                            branchSubTab === "menu" ? "active" : ""
-                          }`}
+                          className={`filter-pill-btn ${branchSubTab === "menu" ? "active" : ""
+                            }`}
                           onClick={() => setBranchSubTab("menu")}
                         >
                           <Icon name="bag" size={13} />
@@ -7857,9 +7812,8 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          className={`filter-pill-btn ${
-                            branchSubTab === "inventory" ? "active" : ""
-                          }`}
+                          className={`filter-pill-btn ${branchSubTab === "inventory" ? "active" : ""
+                            }`}
                           onClick={() => setBranchSubTab("inventory")}
                         >
                           <Icon name="store" size={13} />
@@ -7869,9 +7823,8 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          className={`filter-pill-btn ${
-                            branchSubTab === "staff" ? "active" : ""
-                          }`}
+                          className={`filter-pill-btn ${branchSubTab === "staff" ? "active" : ""
+                            }`}
                           onClick={() => setBranchSubTab("staff")}
                         >
                           <Icon name="users" size={13} />
@@ -7910,9 +7863,8 @@ export default function App() {
                                 <button
                                   key={st}
                                   type="button"
-                                  className={`btn-secondary ${
-                                    branchOrderFilter === st ? "active" : ""
-                                  }`}
+                                  className={`btn-secondary ${branchOrderFilter === st ? "active" : ""
+                                    }`}
                                   style={{
                                     fontSize: "11px",
                                     padding: "4px 8px",
@@ -7981,16 +7933,15 @@ export default function App() {
                                         </small>
                                       </div>
                                       <span
-                                        className={`status-pill ${
-                                          ord.order_status ===
-                                          "Ready for pickup"
+                                        className={`status-pill ${ord.order_status ===
+                                            "Ready for pickup"
                                             ? "ready"
                                             : ord.order_status === "Preparing"
                                               ? "preparing"
                                               : ord.order_status === "Completed"
                                                 ? "completed"
                                                 : "pending"
-                                        }`}
+                                          }`}
                                       >
                                         {ord.order_status}
                                       </span>
@@ -8006,13 +7957,13 @@ export default function App() {
                                           </strong>
                                         </li>
                                       )) || (
-                                        <li className="kds-item-row">
-                                          <span>Order Total</span>
-                                          <strong>
-                                            ₱{ord.total_amount}.00
-                                          </strong>
-                                        </li>
-                                      )}
+                                          <li className="kds-item-row">
+                                            <span>Order Total</span>
+                                            <strong>
+                                              ₱{ord.total_amount}.00
+                                            </strong>
+                                          </li>
+                                        )}
                                     </ul>
                                   </div>
                                   <div
@@ -8075,28 +8026,28 @@ export default function App() {
                                     )}
                                     {ord.order_status ===
                                       "Ready for pickup" && (
-                                      <button
-                                        type="button"
-                                        className="kds-btn-action"
-                                        style={{
-                                          background: "#16a34a",
-                                          color: "#fff",
-                                        }}
-                                        onClick={async () => {
-                                          await canteenApi.orders.updateStatus(
-                                            ord.id,
-                                            "Completed",
-                                          )
-                                          await canteenApi.orders.updatePaymentStatus(
-                                            ord.id,
-                                            "paid",
-                                          )
-                                          refreshAllData()
-                                        }}
-                                      >
-                                        ✓ Complete Ticket
-                                      </button>
-                                    )}
+                                        <button
+                                          type="button"
+                                          className="kds-btn-action"
+                                          style={{
+                                            background: "#16a34a",
+                                            color: "#fff",
+                                          }}
+                                          onClick={async () => {
+                                            await canteenApi.orders.updateStatus(
+                                              ord.id,
+                                              "Completed",
+                                            )
+                                            await canteenApi.orders.updatePaymentStatus(
+                                              ord.id,
+                                              "paid",
+                                            )
+                                            refreshAllData()
+                                          }}
+                                        >
+                                          ✓ Complete Ticket
+                                        </button>
+                                      )}
                                     {ord.order_status === "Completed" && (
                                       <div
                                         style={{
@@ -8233,11 +8184,10 @@ export default function App() {
                                     <td>
                                       <button
                                         type="button"
-                                        className={`status-pill ${
-                                          item.is_available
+                                        className={`status-pill ${item.is_available
                                             ? "ready"
                                             : "cancelled"
-                                        }`}
+                                          }`}
                                         style={{ cursor: "pointer", border: 0 }}
                                         onClick={async () => {
                                           const newStatus = !item.is_available
@@ -8245,9 +8195,9 @@ export default function App() {
                                             prev.map((i) =>
                                               Number(i.id) === Number(item.id)
                                                 ? {
-                                                    ...i,
-                                                    is_available: newStatus,
-                                                  }
+                                                  ...i,
+                                                  is_available: newStatus,
+                                                }
                                                 : i,
                                             ),
                                           )
@@ -8604,25 +8554,22 @@ export default function App() {
                 style={{ display: "flex", gap: "8px", marginBottom: "22px" }}
               >
                 <button
-                  className={`filter-pill-btn ${
-                    studentNavTab === "menu" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${studentNavTab === "menu" ? "active" : ""
+                    }`}
                   onClick={() => { setStudentNavTab("menu"); setMobileMenuOpen(false); }}
                 >
                   Food Menu Catalog
                 </button>
                 <button
-                  className={`filter-pill-btn ${
-                    studentNavTab === "active_ticket" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${studentNavTab === "active_ticket" ? "active" : ""
+                    }`}
                   onClick={() => { setStudentNavTab("active_ticket"); setMobileMenuOpen(false); }}
                 >
                   Live Active Ticket {activeOrder && "●"}
                 </button>
                 <button
-                  className={`filter-pill-btn ${
-                    studentNavTab === "history" ? "active" : ""
-                  }`}
+                  className={`filter-pill-btn ${studentNavTab === "history" ? "active" : ""
+                    }`}
                   onClick={() => { setStudentNavTab("history"); setMobileMenuOpen(false); }}
                 >
                   Order History
@@ -8689,9 +8636,8 @@ export default function App() {
                               idx === 0
                             return (
                               <div
-                                className={`ticket-step-node ${
-                                  isDone ? "done" : ""
-                                }`}
+                                className={`ticket-step-node ${isDone ? "done" : ""
+                                  }`}
                                 key={step}
                               >
                                 <div className="ticket-node-icon">
@@ -8731,9 +8677,8 @@ export default function App() {
                     {/* Branch Switcher */}
                     <div className="filter-pills-row">
                       <button
-                        className={`filter-pill-btn ${
-                          selectedStallFilter === "all" ? "active" : ""
-                        }`}
+                        className={`filter-pill-btn ${selectedStallFilter === "all" ? "active" : ""
+                          }`}
                         onClick={() => setSelectedStallFilter("all")}
                       >
                         All Branches
@@ -8741,9 +8686,8 @@ export default function App() {
                       {stalls.map((s) => (
                         <button
                           key={s.id}
-                          className={`filter-pill-btn ${
-                            selectedStallFilter === s.id ? "active" : ""
-                          }`}
+                          className={`filter-pill-btn ${selectedStallFilter === s.id ? "active" : ""
+                            }`}
                           onClick={() => setSelectedStallFilter(s.id)}
                         >
                           {s.name} ({s.stall_code})
@@ -8760,9 +8704,8 @@ export default function App() {
                     {categories.map((cat) => (
                       <button
                         key={cat}
-                        className={`filter-pill-btn ${
-                          category === cat ? "active" : ""
-                        }`}
+                        className={`filter-pill-btn ${category === cat ? "active" : ""
+                          }`}
                         onClick={() => setCategory(cat)}
                       >
                         {cat}
@@ -8897,9 +8840,8 @@ export default function App() {
                           const isCurrent = activeOrder.order_status === step
                           return (
                             <div
-                              className={`ticket-step-node ${
-                                isDone ? "done" : ""
-                              } ${isCurrent ? "current" : ""}`}
+                              className={`ticket-step-node ${isDone ? "done" : ""
+                                } ${isCurrent ? "current" : ""}`}
                               key={step}
                             >
                               <div className="ticket-node-icon">
@@ -9010,62 +8952,62 @@ export default function App() {
                       {((activeOrder.order_items &&
                         activeOrder.order_items.length > 0) ||
                         (activeOrder as any).items?.length > 0) && (
-                        <div
-                          style={{
-                            borderTop: "1px solid var(--line)",
-                            paddingTop: "14px",
-                            marginBottom: "12px",
-                          }}
-                        >
-                          <strong
-                            style={{
-                              fontSize: "12px",
-                              display: "block",
-                              marginBottom: "8px",
-                              color: "var(--ink)",
-                            }}
-                          >
-                            Ordered Items:
-                          </strong>
                           <div
                             style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "6px",
+                              borderTop: "1px solid var(--line)",
+                              paddingTop: "14px",
+                              marginBottom: "12px",
                             }}
                           >
-                            {(
-                              activeOrder.order_items ||
-                              (activeOrder as any).items ||
-                              []
-                            ).map((it: any, idx: number) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  fontSize: "12px",
-                                  color: "var(--ink-secondary)",
-                                }}
-                              >
-                                <span>
-                                  {it.item_name ||
-                                    it.name ||
-                                    `Item #${it.menu_item_id || it.id}`}{" "}
-                                  &times; {it.quantity}
-                                </span>
-                                <strong>
-                                  ₱
-                                  {it.item_subtotal ||
-                                    it.price * it.quantity ||
-                                    0}
-                                  .00
-                                </strong>
-                              </div>
-                            ))}
+                            <strong
+                              style={{
+                                fontSize: "12px",
+                                display: "block",
+                                marginBottom: "8px",
+                                color: "var(--ink)",
+                              }}
+                            >
+                              Ordered Items:
+                            </strong>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "6px",
+                              }}
+                            >
+                              {(
+                                activeOrder.order_items ||
+                                (activeOrder as any).items ||
+                                []
+                              ).map((it: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    fontSize: "12px",
+                                    color: "var(--ink-secondary)",
+                                  }}
+                                >
+                                  <span>
+                                    {it.item_name ||
+                                      it.name ||
+                                      `Item #${it.menu_item_id || it.id}`}{" "}
+                                    &times; {it.quantity}
+                                  </span>
+                                  <strong>
+                                    ₱
+                                    {it.item_subtotal ||
+                                      it.price * it.quantity ||
+                                      0}
+                                    .00
+                                  </strong>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                       <div
                         style={{
@@ -9112,7 +9054,7 @@ export default function App() {
                           <div>
                             <strong>{activeOrder.payment_method}</strong>
                             {activeOrder.payment_status === "paid" ||
-                            activeOrder.order_status === "Completed" ? (
+                              activeOrder.order_status === "Completed" ? (
                               <span
                                 className="count-badge ready"
                                 style={{
@@ -9225,7 +9167,7 @@ export default function App() {
                                     currentUser.id,
                                     { balance: newBal },
                                   )
-                                } catch (e) {}
+                                } catch (e) { }
                                 const updatedUser = {
                                   ...currentUser,
                                   balance: newBal,
@@ -9235,7 +9177,7 @@ export default function App() {
                                     "smartbite_session_user",
                                     JSON.stringify(updatedUser),
                                   )
-                                } catch {}
+                                } catch { }
                                 setCurrentUser(updatedUser)
                                 setUserProfiles((prev) =>
                                   prev.map((p) =>
@@ -9249,24 +9191,24 @@ export default function App() {
                                     activeOrder.id,
                                     "paid",
                                   )
-                                } catch {}
+                                } catch { }
                                 setActiveOrder((prev) =>
                                   prev
                                     ? {
-                                        ...prev,
-                                        payment_method: "Canteen Wallet",
-                                        payment_status: "paid",
-                                      }
+                                      ...prev,
+                                      payment_method: "Canteen Wallet",
+                                      payment_status: "paid",
+                                    }
                                     : null,
                                 )
                                 setAllOrders((prev) =>
                                   prev.map((o) =>
                                     o.id === activeOrder.id
                                       ? {
-                                          ...o,
-                                          payment_method: "Canteen Wallet",
-                                          payment_status: "paid",
-                                        }
+                                        ...o,
+                                        payment_method: "Canteen Wallet",
+                                        payment_status: "paid",
+                                      }
                                       : o,
                                   ),
                                 )
@@ -9439,7 +9381,7 @@ export default function App() {
                                 <td>
                                   {ord.payment_method}
                                   {ord.payment_status === "paid" ||
-                                  ord.order_status === "Completed" ? (
+                                    ord.order_status === "Completed" ? (
                                     <span
                                       className="count-badge ready"
                                       style={{
@@ -9885,7 +9827,7 @@ export default function App() {
                       marginTop: "8px",
                       opacity:
                         checkoutPaymentMethod === "wallet" &&
-                        Number(currentUser.balance || 0) < subtotal
+                          Number(currentUser.balance || 0) < subtotal
                           ? 0.6
                           : 1,
                     }}
@@ -10562,415 +10504,411 @@ export default function App() {
                 </div>
               </div>
             ) : (
-            <form onSubmit={handleAdminCreateUser}>
-              <div
-                className="crud-modal-body"
-                style={{ maxHeight: "70vh", overflowY: "auto" }}
-              >
-                {adminUserModalError && (
-                  <div className="toast-error">{adminUserModalError}</div>
-                )}
-                {adminUserModalSuccess && (
-                  <div className="toast-success">{adminUserModalSuccess}</div>
-                )}
-
-                {/* Role Selector Tabs */}
-                <div className="crud-form-group">
-                  <label>Select Account Role</label>
-                  <div className="modal-role-selector">
-                    <button
-                      type="button"
-                      className={`modal-role-btn ${
-                        newRole === "stall_manager" ? "active" : ""
-                      }`}
-                      onClick={() => setNewRole("stall_manager")}
-                    >
-                      Stall Account
-                    </button>
-                    <button
-                      type="button"
-                      className={`modal-role-btn ${
-                        newRole === "admin" ? "active" : ""
-                      }`}
-                      onClick={() => setNewRole("admin")}
-                    >
-                      Admin User
-                    </button>
-                    <button
-                      type="button"
-                      className={`modal-role-btn ${
-                        newRole === "staff" ? "active" : ""
-                      }`}
-                      onClick={() => setNewRole("staff")}
-                    >
-                      Staff Member
-                    </button>
-                    <button
-                      type="button"
-                      className={`modal-role-btn ${
-                        newRole === "student" ? "active" : ""
-                      }`}
-                      onClick={() => setNewRole("student")}
-                    >
-                      Customer (Student)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Name Breakdown: First Name, Middle Name, Last Name */}
-                <div className="crud-form-group">
-                  <label>Full Name *</label>
-                  <div className="name-inputs-row">
-                    <div>
-                      <input
-                        placeholder="First Name *"
-                        value={newFirstName}
-                        onChange={(e) =>
-                          setNewFirstName(
-                            e.target.value.replace(/[^A-Za-z\s]/g, ""),
-                          )
-                        }
-                        required
-                      />
-                    </div>
-                    <div>
-                      <input
-                        placeholder="Middle Name*"
-                        value={newMiddleName}
-                        onChange={(e) =>
-                          setNewMiddleName(
-                            e.target.value.replace(/[^A-Za-z\s]/g, ""),
-                          )
-                        }
-                      />
-                    </div>
-                    <div>
-                      <input
-                        placeholder="Last Name*"
-                        value={newLastName}
-                        onChange={(e) =>
-                          setNewLastName(
-                            e.target.value.replace(/[^A-Za-z\s]/g, ""),
-                          )
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ID Number and Email */}
+              <form onSubmit={handleAdminCreateUser}>
                 <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                  }}
+                  className="crud-modal-body"
+                  style={{ maxHeight: "70vh", overflowY: "auto" }}
                 >
-                  <div className="crud-form-group">
-                    <label>ID Number *</label>
-                    <input
-                      placeholder="Enter your ID Number"
-                      value={newUserId}
-                      onChange={(e) =>
-                        setNewUserId(e.target.value.replace(/\D/g, ""))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="crud-form-group">
-                    <label>Email*</label>
-                    <input
-                      type="email"
-                      placeholder="Enter your Email"
-                      value={newUserEmail}
-                      onChange={(e) => setNewUserEmail(e.target.value.trim())}
-                      required
-                    />
-                  </div>
-                </div>
+                  {adminUserModalError && (
+                    <div className="toast-error">{adminUserModalError}</div>
+                  )}
+                  {adminUserModalSuccess && (
+                    <div className="toast-success">{adminUserModalSuccess}</div>
+                  )}
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                  }}
-                >
+                  {/* Role Selector Tabs */}
                   <div className="crud-form-group">
-                    <label>Phone Number *</label>
-                    <input
-                      type="tel"
-                      placeholder="Enter your phone number"
-                      value={newPhone}
-                      onChange={(e) =>
-                        setNewPhone(
-                          e.target.value.replace(/\D/g, "").slice(0, 11),
-                        )
-                      }
-                      maxLength={11}
-                      required
-                    />
-                    <small
-                      style={{
-                        color: "var(--muted)",
-                        fontSize: "11px",
-                        marginTop: "3px",
-                        display: "block",
-                      }}
-                    ></small>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                  }}
-                >
-                  <div className="crud-form-group">
-                    <label>Create a Password *</label>
-                    <div
-                      style={{
-                        position: "relative",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      <input
-                        type={showNewPassword ? "text" : "password"}
-                        placeholder="Password "
-                        value={newPassword}
-                        onChange={(e) =>
-                          setNewPassword(e.target.value.replace(/\s/g, ""))
-                        }
-                        style={{
-                          width: "100%",
-                          paddingRight: "38px",
-                          boxSizing: "border-box",
-                        }}
-                        required
-                      />
+                    <label>Select Account Role</label>
+                    <div className="modal-role-selector">
                       <button
                         type="button"
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                        tabIndex={-1}
-                        style={{
-                          position: "absolute",
-                          right: "8px",
-                          background: "none",
-                          border: "none",
-                          color: "var(--muted)",
-                          cursor: "pointer",
-                          padding: "4px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        title={
-                          showNewPassword ? "Hide password" : "Show password"
-                        }
+                        className={`modal-role-btn ${newRole === "stall_manager" ? "active" : ""
+                          }`}
+                        onClick={() => setNewRole("stall_manager")}
                       >
-                        <Icon
-                          name={showNewPassword ? "eye-off" : "eye"}
-                          size={17}
-                        />
+                        Stall Account
+                      </button>
+                      <button
+                        type="button"
+                        className={`modal-role-btn ${newRole === "admin" ? "active" : ""
+                          }`}
+                        onClick={() => setNewRole("admin")}
+                      >
+                        Admin User
+                      </button>
+                      <button
+                        type="button"
+                        className={`modal-role-btn ${newRole === "staff" ? "active" : ""
+                          }`}
+                        onClick={() => setNewRole("staff")}
+                      >
+                        Staff Member
+                      </button>
+                      <button
+                        type="button"
+                        className={`modal-role-btn ${newRole === "student" ? "active" : ""
+                          }`}
+                        onClick={() => setNewRole("student")}
+                      >
+                        Customer (Student)
                       </button>
                     </div>
                   </div>
+
+                  {/* Name Breakdown: First Name, Middle Name, Last Name */}
                   <div className="crud-form-group">
-                    <label>Initial Balance (₱)</label>
-                    <input
-                      type="number"
-                      value={newBalance}
-                      onChange={(e) => setNewBalance(Number(e.target.value))}
-                    />
+                    <label>Full Name *</label>
+                    <div className="name-inputs-row">
+                      <div>
+                        <input
+                          placeholder="First Name *"
+                          value={newFirstName}
+                          onChange={(e) =>
+                            setNewFirstName(
+                              e.target.value.replace(/[^A-Za-z\s]/g, ""),
+                            )
+                          }
+                          required
+                        />
+                      </div>
+                      <div>
+                        <input
+                          placeholder="Middle Name*"
+                          value={newMiddleName}
+                          onChange={(e) =>
+                            setNewMiddleName(
+                              e.target.value.replace(/[^A-Za-z\s]/g, ""),
+                            )
+                          }
+                        />
+                      </div>
+                      <div>
+                        <input
+                          placeholder="Last Name*"
+                          value={newLastName}
+                          onChange={(e) =>
+                            setNewLastName(
+                              e.target.value.replace(/[^A-Za-z\s]/g, ""),
+                            )
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* STALL ASSIGNMENT (Staff belongs to a stall; 1 stall handles many staff users) */}
-                {newRole === "staff" && (
-                  <div
-                    className="crud-form-group"
-                    style={{
-                      background: "var(--bg-subtle)",
-                      padding: "12px",
-                      borderRadius: "8px",
-                    }}
-                  >
-                    <label style={{ color: "var(--primary)", fontWeight: 800 }}>
-                      Assigned Canteen Stall (1 Stall handles many staff)
-                    </label>
-                    <select
-                      value={newStallId}
-                      onChange={(e) => setNewStallId(Number(e.target.value))}
-                      style={{ marginTop: "6px" }}
-                    >
-                      {stalls.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.stall_code}) &bull;{" "}
-                          {
-                            userProfiles.filter(
-                              (u) =>
-                                u.role === "staff" &&
-                                (u.stall_id || 1) === s.id,
-                            ).length
-                          }{" "}
-                          current staff
-                        </option>
-                      ))}
-                    </select>
-                    <small
-                      style={{
-                        color: "var(--muted)",
-                        fontSize: "11px",
-                        display: "block",
-                        marginTop: "4px",
-                      }}
-                    >
-                      This staff member will prepare and process orders for this
-                      stall branch.
-                    </small>
-                  </div>
-                )}
-
-                {/* STALL ACCOUNT SPECIFIC: ASSIGN TO EXISTING OR CREATE NEW STALL BRANCH */}
-                {newRole === "stall_manager" && (
+                  {/* ID Number and Email */}
                   <div
                     style={{
-                      background: "var(--bg-subtle)",
-                      padding: "14px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--line)",
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "10px",
-                      }}
-                    >
+                    <div className="crud-form-group">
+                      <label>ID Number *</label>
                       <input
-                        type="checkbox"
-                        id="newStallChk"
-                        checked={createNewStallCheckbox}
+                        placeholder="Enter your ID Number"
+                        value={newUserId}
                         onChange={(e) =>
-                          setCreateNewStallCheckbox(e.target.checked)
+                          setNewUserId(e.target.value.replace(/\D/g, ""))
                         }
+                        required
                       />
-                      <label
-                        htmlFor="newStallChk"
+                    </div>
+                    <div className="crud-form-group">
+                      <label>Email*</label>
+                      <input
+                        type="email"
+                        placeholder="Enter your Email"
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value.trim())}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
+                    }}
+                  >
+                    <div className="crud-form-group">
+                      <label>Phone Number *</label>
+                      <input
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={newPhone}
+                        onChange={(e) =>
+                          setNewPhone(
+                            e.target.value.replace(/\D/g, "").slice(0, 11),
+                          )
+                        }
+                        maxLength={11}
+                        required
+                      />
+                      <small
                         style={{
-                          fontWeight: 700,
-                          fontSize: "13px",
-                          cursor: "pointer",
+                          color: "var(--muted)",
+                          fontSize: "11px",
+                          marginTop: "3px",
+                          display: "block",
+                        }}
+                      ></small>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
+                    }}
+                  >
+                    <div className="crud-form-group">
+                      <label>Create a Password *</label>
+                      <div
+                        style={{
+                          position: "relative",
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
-                        Register a Brand New Canteen Stall Branch in System
-                      </label>
-                    </div>
-
-                    {!createNewStallCheckbox ? (
-                      <div className="crud-form-group" style={{ margin: 0 }}>
-                        <label>Manage Existing Stall Branch</label>
-                        <select
-                          value={newStallId}
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Password "
+                          value={newPassword}
                           onChange={(e) =>
-                            setNewStallId(Number(e.target.value))
+                            setNewPassword(e.target.value.replace(/\s/g, ""))
+                          }
+                          style={{
+                            width: "100%",
+                            paddingRight: "38px",
+                            boxSizing: "border-box",
+                          }}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          tabIndex={-1}
+                          style={{
+                            position: "absolute",
+                            right: "8px",
+                            background: "none",
+                            border: "none",
+                            color: "var(--muted)",
+                            cursor: "pointer",
+                            padding: "4px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          title={
+                            showNewPassword ? "Hide password" : "Show password"
                           }
                         >
-                          {stalls.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} ({s.stall_code})
-                            </option>
-                          ))}
-                        </select>
+                          <Icon
+                            name={showNewPassword ? "eye-off" : "eye"}
+                            size={17}
+                          />
+                        </button>
                       </div>
-                    ) : (
+                    </div>
+                    <div className="crud-form-group">
+                      <label>Initial Balance (₱)</label>
+                      <input
+                        type="number"
+                        value={newBalance}
+                        onChange={(e) => setNewBalance(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* STALL ASSIGNMENT (Staff belongs to a stall; 1 stall handles many staff users) */}
+                  {newRole === "staff" && (
+                    <div
+                      className="crud-form-group"
+                      style={{
+                        background: "var(--bg-subtle)",
+                        padding: "12px",
+                        borderRadius: "8px",
+                      }}
+                    >
+                      <label style={{ color: "var(--primary)", fontWeight: 800 }}>
+                        Assigned Canteen Stall (1 Stall handles many staff)
+                      </label>
+                      <select
+                        value={newStallId}
+                        onChange={(e) => setNewStallId(Number(e.target.value))}
+                        style={{ marginTop: "6px" }}
+                      >
+                        {stalls.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.stall_code}) &bull;{" "}
+                            {
+                              userProfiles.filter(
+                                (u) =>
+                                  u.role === "staff" &&
+                                  (u.stall_id || 1) === s.id,
+                              ).length
+                            }{" "}
+                            current staff
+                          </option>
+                        ))}
+                      </select>
+                      <small
+                        style={{
+                          color: "var(--muted)",
+                          fontSize: "11px",
+                          display: "block",
+                          marginTop: "4px",
+                        }}
+                      >
+                        This staff member will prepare and process orders for this
+                        stall branch.
+                      </small>
+                    </div>
+                  )}
+
+                  {/* STALL ACCOUNT SPECIFIC: ASSIGN TO EXISTING OR CREATE NEW STALL BRANCH */}
+                  {newRole === "stall_manager" && (
+                    <div
+                      style={{
+                        background: "var(--bg-subtle)",
+                        padding: "14px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--line)",
+                      }}
+                    >
                       <div
                         style={{
                           display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
+                          alignItems: "center",
+                          gap: "8px",
+                          marginBottom: "10px",
                         }}
                       >
+                        <input
+                          type="checkbox"
+                          id="newStallChk"
+                          checked={createNewStallCheckbox}
+                          onChange={(e) =>
+                            setCreateNewStallCheckbox(e.target.checked)
+                          }
+                        />
+                        <label
+                          htmlFor="newStallChk"
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "13px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Register a Brand New Canteen Stall Branch in System
+                        </label>
+                      </div>
+
+                      {!createNewStallCheckbox ? (
+                        <div className="crud-form-group" style={{ margin: 0 }}>
+                          <label>Manage Existing Stall Branch</label>
+                          <select
+                            value={newStallId}
+                            onChange={(e) =>
+                              setNewStallId(Number(e.target.value))
+                            }
+                          >
+                            {stalls.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} ({s.stall_code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
                         <div
                           style={{
-                            display: "grid",
-                            gridTemplateColumns: "2fr 1fr",
+                            display: "flex",
+                            flexDirection: "column",
                             gap: "10px",
                           }}
                         >
                           <div
-                            className="crud-form-group"
-                            style={{ margin: 0 }}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "2fr 1fr",
+                              gap: "10px",
+                            }}
                           >
-                            <label>Branch / Stall Name *</label>
-                            <input
-                              placeholder="e.g. Station C &ndash; Beverage Hub"
-                              value={newStallName}
-                              onChange={(e) => setNewStallName(e.target.value)}
-                              required={createNewStallCheckbox}
-                            />
+                            <div
+                              className="crud-form-group"
+                              style={{ margin: 0 }}
+                            >
+                              <label>Branch / Stall Name *</label>
+                              <input
+                                placeholder="e.g. Station C &ndash; Beverage Hub"
+                                value={newStallName}
+                                onChange={(e) => setNewStallName(e.target.value)}
+                                required={createNewStallCheckbox}
+                              />
+                            </div>
+                            <div
+                              className="crud-form-group"
+                              style={{ margin: 0 }}
+                            >
+                              <label>Stall Code</label>
+                              <input
+                                placeholder="e.g. STALL-03"
+                                value={newStallCode}
+                                onChange={(e) => setNewStallCode(e.target.value)}
+                              />
+                            </div>
                           </div>
-                          <div
-                            className="crud-form-group"
-                            style={{ margin: 0 }}
-                          >
-                            <label>Stall Code</label>
+                          <div className="crud-form-group" style={{ margin: 0 }}>
+                            <label>Stall Description</label>
                             <input
-                              placeholder="e.g. STALL-03"
-                              value={newStallCode}
-                              onChange={(e) => setNewStallCode(e.target.value)}
+                              placeholder="e.g. Fresh fruit juices, milk teas, and hot espresso"
+                              value={newStallDesc}
+                              onChange={(e) => setNewStallDesc(e.target.value)}
                             />
                           </div>
                         </div>
-                        <div className="crud-form-group" style={{ margin: 0 }}>
-                          <label>Stall Description</label>
-                          <input
-                            placeholder="e.g. Fresh fruit juices, milk teas, and hot espresso"
-                            value={newStallDesc}
-                            onChange={(e) => setNewStallDesc(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              <div className="crud-modal-footer">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setAdminCreateUserModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="auth-btn-primary"
-                  type="submit"
-                  style={{
-                    width: "auto",
-                    padding: "0 24px",
-                    height: "40px",
-                    fontSize: "13px",
-                  }}
-                >
-                  Create{" "}
-                  {newRole === "stall_manager"
-                    ? "Stall Account"
-                    : newRole === "admin"
-                      ? "Admin User"
-                      : newRole === "staff"
-                        ? "Staff Member"
-                        : "Customer Account"}
-                </button>
-              </div>
-            </form>
+                <div className="crud-modal-footer">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setAdminCreateUserModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="auth-btn-primary"
+                    type="submit"
+                    style={{
+                      width: "auto",
+                      padding: "0 24px",
+                      height: "40px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Create{" "}
+                    {newRole === "stall_manager"
+                      ? "Stall Account"
+                      : newRole === "admin"
+                        ? "Admin User"
+                        : newRole === "staff"
+                          ? "Staff Member"
+                          : "Customer Account"}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         </div>
@@ -11099,7 +11037,7 @@ export default function App() {
                       display: "block",
                     }}
                   >
-                    
+
                   </small>
                 </div>
               </div>
@@ -11185,7 +11123,7 @@ export default function App() {
                   <div className="toast-success">{editSuccess}</div>
                 )}
                 <p className="auth-callout-notice" role="note">
-                  
+
                 </p>
 
                 {/* Role Selector Tabs */}
@@ -11194,36 +11132,32 @@ export default function App() {
                   <div className="modal-role-selector">
                     <button
                       type="button"
-                      className={`modal-role-btn ${
-                        editRole === "stall_manager" ? "active" : ""
-                      }`}
+                      className={`modal-role-btn ${editRole === "stall_manager" ? "active" : ""
+                        }`}
                       onClick={() => setEditRole("stall_manager")}
                     >
                       Stall Account
                     </button>
                     <button
                       type="button"
-                      className={`modal-role-btn ${
-                        editRole === "admin" ? "active" : ""
-                      }`}
+                      className={`modal-role-btn ${editRole === "admin" ? "active" : ""
+                        }`}
                       onClick={() => setEditRole("admin")}
                     >
                       Admin User
                     </button>
                     <button
                       type="button"
-                      className={`modal-role-btn ${
-                        editRole === "staff" ? "active" : ""
-                      }`}
+                      className={`modal-role-btn ${editRole === "staff" ? "active" : ""
+                        }`}
                       onClick={() => setEditRole("staff")}
                     >
                       Staff Member
                     </button>
                     <button
                       type="button"
-                      className={`modal-role-btn ${
-                        editRole === "student" ? "active" : ""
-                      }`}
+                      className={`modal-role-btn ${editRole === "student" ? "active" : ""
+                        }`}
                       onClick={() => setEditRole("student")}
                     >
                       Customer (Student)
@@ -11279,11 +11213,10 @@ export default function App() {
                       display: "block",
                     }}
                   >
-                  
+
                     <strong>
-                      {`${editFirstName.trim()} ${
-                        editMiddleName.trim() ? editMiddleName.trim() + " " : ""
-                      }${editLastName.trim()}`.trim() || "—"}
+                      {`${editFirstName.trim()} ${editMiddleName.trim() ? editMiddleName.trim() + " " : ""
+                        }${editLastName.trim()}`.trim() || "—"}
                     </strong>
                   </small>
                 </div>
@@ -11348,7 +11281,7 @@ export default function App() {
                         display: "block",
                       }}
                     >
-                    
+
                     </small>
                   </div>
                 </div>

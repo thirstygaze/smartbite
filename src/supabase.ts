@@ -97,7 +97,7 @@ export async function sendEmailVerificationCode(
           res.status >= 500
             ? "The email server could not send the code (SMTP configuration error). Please contact the administrator."
             : data?.msg ||
-              "Could not send verification code to this email address.",
+            "Could not send verification code to this email address.",
       }
     }
   } catch (err: any) {
@@ -484,7 +484,7 @@ export const supabase = {
             arr.map((s: string) => String(s).toLowerCase().trim()),
           )
         }
-      } catch {}
+      } catch { }
     }
 
     // 1. Fetch remote audit logs of deleted profiles so deletions persist across other tabs, PCs, and mobiles
@@ -512,7 +512,7 @@ export const supabase = {
           }
         }
       }
-    } catch {}
+    } catch { }
 
     const isDeleted = (p: Partial<Profile>) => {
       const pid = (p.id || "").toLowerCase().trim()
@@ -546,7 +546,7 @@ export const supabase = {
           remoteData = data.filter((p) => p.is_active !== false && !isDeleted(p))
         }
       }
-    } catch {}
+    } catch { }
 
     // Persist updated deletedSet to local storage for instant offline/re-render filtering
     try {
@@ -554,7 +554,7 @@ export const supabase = {
         "smartbite_deleted_profiles",
         JSON.stringify(Array.from(deletedSet)),
       )
-    } catch {}
+    } catch { }
 
     const saved = localStorage.getItem("smartbite_profiles")
     let localList: Profile[] = []
@@ -564,7 +564,7 @@ export const supabase = {
         if (Array.isArray(parsed) && parsed.length > 0) {
           localList = parsed.filter((p) => !isDeleted(p))
         }
-      } catch {}
+      } catch { }
     }
 
     // Always start with INITIAL_PROFILES so default system accounts (admin, staff, student) exist UNLESS deleted
@@ -604,7 +604,7 @@ export const supabase = {
     })
     try {
       localStorage.setItem("smartbite_profiles", JSON.stringify(sanitized))
-    } catch {}
+    } catch { }
     return sanitized
   },
 
@@ -654,7 +654,7 @@ export const supabase = {
           "smartbite_deleted_profiles",
           JSON.stringify(unblacklisted),
         )
-      } catch {}
+      } catch { }
     }
 
     try {
@@ -668,7 +668,7 @@ export const supabase = {
         const result = Array.isArray(created) ? created[0] : created
         return { ...newProfile, ...result }
       }
-    } catch {}
+    } catch { }
 
     // Save to local storage
     const profiles = await this.getProfiles()
@@ -690,7 +690,7 @@ export const supabase = {
           body: JSON.stringify(updates),
         },
       )
-    } catch {}
+    } catch { }
 
     const profiles = await this.getProfiles()
     const updated = profiles.map((p) =>
@@ -710,7 +710,7 @@ export const supabase = {
       try {
         const parsed = JSON.parse(deletedRaw)
         if (Array.isArray(parsed)) deletedList = parsed
-      } catch {}
+      } catch { }
     }
 
     if (cleanId && !deletedList.includes(cleanId.toLowerCase())) {
@@ -748,7 +748,7 @@ export const supabase = {
           })
           localStorage.setItem("smartbite_profiles", JSON.stringify(updated))
         }
-      } catch {}
+      } catch { }
     }
 
     // 3. Mark inactive in Supabase remote database in case foreign keys prevent hard DELETE
@@ -769,7 +769,7 @@ export const supabase = {
           }),
         })
       }
-    } catch {}
+    } catch { }
 
     // 4. Delete from Supabase remote database matching both id and student_id
     try {
@@ -815,7 +815,7 @@ export const supabase = {
           },
         }),
       })
-    } catch {}
+    } catch { }
   },
 
   async changePassword(
@@ -846,7 +846,7 @@ export const supabase = {
           }))
         }
       }
-    } catch {}
+    } catch { }
 
     const saved = localStorage.getItem("smartbite_stalls")
     let localList: Stall[] = []
@@ -854,7 +854,7 @@ export const supabase = {
       try {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) localList = parsed
-      } catch {}
+      } catch { }
     }
 
     if (remoteData.length > 0) {
@@ -892,7 +892,7 @@ export const supabase = {
     ]
     try {
       localStorage.setItem("smartbite_stalls", JSON.stringify(initialStalls))
-    } catch {}
+    } catch { }
     return initialStalls
   },
 
@@ -908,7 +908,7 @@ export const supabase = {
         Number(s.id) === numId ? { ...s, ...updates } : s,
       )
       localStorage.setItem("smartbite_stalls", JSON.stringify(updated))
-    } catch {}
+    } catch { }
 
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/stalls?id=eq.${numId}`, {
@@ -944,7 +944,7 @@ export const supabase = {
         const created = await res.json()
         return Array.isArray(created) ? created[0] : created
       }
-    } catch {}
+    } catch { }
 
     const stalls = await this.getStalls()
     const updated = [...stalls, newStall]
@@ -987,7 +987,7 @@ export const supabase = {
       try {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) localList = parsed
-      } catch {}
+      } catch { }
     }
 
     if (remoteData.length > 0) {
@@ -1104,7 +1104,7 @@ export const supabase = {
     ]
     try {
       localStorage.setItem("smartbite_menu_items", JSON.stringify(initialItems))
-    } catch {}
+    } catch { }
     return stallId
       ? initialItems.filter((i) => Number(i.stall_id) === Number(stallId))
       : initialItems
@@ -1176,7 +1176,7 @@ export const supabase = {
         method: "DELETE",
         headers,
       })
-    } catch {}
+    } catch { }
 
     const all = await this.getMenuItems()
     const updated = all.filter((i) => Number(i.id) !== numId)
@@ -1209,7 +1209,7 @@ export const supabase = {
           }))
         }
       }
-    } catch {}
+    } catch { }
 
     // Merge with locally persisted edits in localStorage so user edits never revert
     const saved = localStorage.getItem("smartbite_inventory")
@@ -1218,7 +1218,7 @@ export const supabase = {
       try {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) localList = parsed
-      } catch {}
+      } catch { }
     }
 
     if (remoteData.length > 0) {
@@ -1233,7 +1233,7 @@ export const supabase = {
       }
       try {
         localStorage.setItem("smartbite_inventory", JSON.stringify(merged))
-      } catch {}
+      } catch { }
       return stallId
         ? merged.filter((i) => Number(i.stall_id) === Number(stallId))
         : merged
@@ -1303,7 +1303,7 @@ export const supabase = {
     ]
     try {
       localStorage.setItem("smartbite_inventory", JSON.stringify(initial))
-    } catch {}
+    } catch { }
     return stallId
       ? initial.filter((i) => Number(i.stall_id) === Number(stallId))
       : initial
@@ -1322,7 +1322,7 @@ export const supabase = {
         const data = await res.json()
         return Array.isArray(data) ? data[0] : data
       }
-    } catch {}
+    } catch { }
 
     const all = await this.getInventory()
     const newItem: InventoryItem = { id: Date.now(), ...item }
@@ -1360,7 +1360,7 @@ export const supabase = {
         headers: { ...headers, Prefer: "return=representation" },
         body: JSON.stringify(updates),
       })
-    } catch {}
+    } catch { }
   },
 
   async restockInventory(
@@ -1395,7 +1395,7 @@ export const supabase = {
         headers: { ...headers, Prefer: "return=representation" },
         body: JSON.stringify({ current_stock: newStock }),
       })
-    } catch {}
+    } catch { }
 
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/rpc/sp_restock_inventory`, {
@@ -1406,7 +1406,7 @@ export const supabase = {
           p_quantity_added: quantityAdded,
         }),
       })
-    } catch {}
+    } catch { }
 
     return { ok: true, current_stock: newStock }
   },
@@ -1484,9 +1484,9 @@ export const supabase = {
     const isUUID = (str?: string | null) =>
       Boolean(
         str &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-            str,
-          ),
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          str,
+        ),
       )
 
     const subtotal = items.reduce(
@@ -1553,7 +1553,7 @@ export const supabase = {
       if (rpcRes.ok) {
         rpcSucceeded = true
         if (effectivePaymentStatus === "paid") {
-          await this.updatePaymentStatus(order.order_id, "paid").catch(() => {})
+          await this.updatePaymentStatus(order.order_id, "paid").catch(() => { })
         }
       } else {
         const errJson = await rpcRes.json().catch(() => ({}))
@@ -1632,7 +1632,7 @@ export const supabase = {
         "smartbite_orders",
         JSON.stringify([orderRecord, ...filtered]),
       )
-    } catch {}
+    } catch { }
 
     return orderRecord
   },
@@ -1667,30 +1667,30 @@ export const supabase = {
             order_items:
               Array.isArray(o.order_items) && o.order_items.length > 0
                 ? o.order_items.map((i: any) => ({
-                    id: i.id,
-                    order_id: i.order_id,
-                    menu_item_id: Number(i.menu_item_id),
-                    item_name: i.item_name || `Item #${i.menu_item_id}`,
-                    quantity: Number(i.quantity),
-                    unit_price: Number(i.unit_price),
-                    item_subtotal: Number(
-                      i.item_subtotal ??
-                        Number(i.unit_price) * Number(i.quantity),
-                    ),
-                    special_instructions: i.special_instructions,
-                    item_status: i.item_status || "pending",
-                  }))
+                  id: i.id,
+                  order_id: i.order_id,
+                  menu_item_id: Number(i.menu_item_id),
+                  item_name: i.item_name || `Item #${i.menu_item_id}`,
+                  quantity: Number(i.quantity),
+                  unit_price: Number(i.unit_price),
+                  item_subtotal: Number(
+                    i.item_subtotal ??
+                    Number(i.unit_price) * Number(i.quantity),
+                  ),
+                  special_instructions: i.special_instructions,
+                  item_status: i.item_status || "pending",
+                }))
                 : Array.isArray(o.items) && o.items.length > 0
                   ? o.items.map((i: any) => ({
-                      menu_item_id: Number(i.id || i.menu_item_id),
-                      item_name: i.name || i.item_name || `Item #${i.id}`,
-                      quantity: Number(i.quantity || 1),
-                      unit_price: Number(i.price || i.unit_price || 0),
-                      item_subtotal: Number(
-                        (i.price || i.unit_price || 0) * (i.quantity || 1),
-                      ),
-                      item_status: "pending",
-                    }))
+                    menu_item_id: Number(i.id || i.menu_item_id),
+                    item_name: i.name || i.item_name || `Item #${i.id}`,
+                    quantity: Number(i.quantity || 1),
+                    unit_price: Number(i.price || i.unit_price || 0),
+                    item_subtotal: Number(
+                      (i.price || i.unit_price || 0) * (i.quantity || 1),
+                    ),
+                    item_status: "pending",
+                  }))
                   : [],
           }))
         }
@@ -1704,7 +1704,7 @@ export const supabase = {
     if (saved) {
       try {
         localList = JSON.parse(saved)
-      } catch {}
+      } catch { }
     }
 
     // Merge remote and local (avoiding duplicates by order id)
@@ -1745,7 +1745,7 @@ export const supabase = {
             : o,
         )
         localStorage.setItem("smartbite_orders", JSON.stringify(updated))
-      } catch {}
+      } catch { }
     }
 
     // 2. Try stored procedure
@@ -1763,7 +1763,7 @@ export const supabase = {
         },
       )
       if (res.ok) rpcOk = true
-    } catch {}
+    } catch { }
 
     // 3. Fallback direct PATCH to orders table (matches both clean and hash forms)
     if (!rpcOk) {
@@ -1780,7 +1780,7 @@ export const supabase = {
             }),
           },
         )
-      } catch {}
+      } catch { }
     }
   },
 
@@ -1802,7 +1802,7 @@ export const supabase = {
             : o,
         )
         localStorage.setItem("smartbite_orders", JSON.stringify(updated))
-      } catch {}
+      } catch { }
     }
 
     // 2. Direct PATCH to orders table in Supabase (matches both forms)
@@ -1818,7 +1818,7 @@ export const supabase = {
           }),
         },
       )
-    } catch {}
+    } catch { }
 
     // 3. Also update order_items table in Supabase
     try {
@@ -1832,7 +1832,7 @@ export const supabase = {
           }),
         },
       )
-    } catch {}
+    } catch { }
   },
 
   // ==========================================
@@ -1845,7 +1845,7 @@ export const supabase = {
         { headers },
       )
       if (res.ok) return await res.json()
-    } catch {}
+    } catch { }
     return []
   },
 
@@ -1856,7 +1856,7 @@ export const supabase = {
         { headers },
       )
       if (res.ok) return await res.json()
-    } catch {}
+    } catch { }
     return [
       {
         stall_id: 1,
@@ -1884,7 +1884,7 @@ export const supabase = {
         { headers },
       )
       if (res.ok) return await res.json()
-    } catch {}
+    } catch { }
     return []
   },
 }
